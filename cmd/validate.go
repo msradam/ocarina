@@ -7,6 +7,8 @@ import (
 	"os"
 	"regexp"
 
+	"github.com/fatih/color"
+	jschema "github.com/google/jsonschema-go/jsonschema"
 	"github.com/msradam/ocarina/internal/interp"
 	"github.com/msradam/ocarina/internal/mcpclient"
 	"github.com/msradam/ocarina/internal/playbook"
@@ -15,14 +17,11 @@ import (
 
 var templateKeyRe = regexp.MustCompile(`\{\{(\w+)\}\}`)
 
-type toolSchema struct {
-	Required   []string              `json:"required"`
-	Properties map[string]schemaProp `json:"properties"`
-}
-
-type schemaProp struct {
-	Type string `json:"type"`
-}
+var (
+	okLabel   = color.New(color.FgGreen, color.Bold).Sprint("OK")
+	errLabel  = color.New(color.FgRed, color.Bold).Sprint("ERROR")
+	warnLabel = color.New(color.FgYellow, color.Bold).Sprint("WARN ")
+)
 
 var validateCmd = &cobra.Command{
 	Use:   "validate <cassette.yaml>",
@@ -58,14 +57,31 @@ Example:
 			return fmt.Errorf("list tools: %w", err)
 		}
 
-		schemas := make(map[string]toolSchema)
+		type schemaEntry struct {
+			required   []string
+			properties map[string]struct{ typ string }
+			raw        []byte
+		}
+		schemas := make(map[string]schemaEntry)
 		for _, t := range res.Tools {
-			var s toolSchema
+			entry := schemaEntry{}
 			if t.InputSchema != nil {
 				raw, _ := json.Marshal(t.InputSchema)
+				entry.raw = raw
+				var s struct {
+					Required   []string `json:"required"`
+					Properties map[string]struct {
+						Type string `json:"type"`
+					} `json:"properties"`
+				}
 				_ = json.Unmarshal(raw, &s)
+				entry.required = s.Required
+				entry.properties = make(map[string]struct{ typ string }, len(s.Properties))
+				for k, p := range s.Properties {
+					entry.properties[k] = struct{ typ string }{p.Type}
+				}
 			}
-			schemas[t.Name] = s
+			schemas[t.Name] = entry
 		}
 
 		// data-flow: keys available via notes + prior echo: fields
@@ -85,36 +101,42 @@ Example:
 
 			var errs, warns []string
 
-			schema, found := schemas[track.Tool]
+			entry, found := schemas[track.Tool]
 			if !found {
 				errs = append(errs, fmt.Sprintf("tool %q not found on server", track.Tool))
 			} else {
 				// required args present
-				for _, req := range schema.Required {
+				for _, req := range entry.required {
 					if _, ok := track.Args[req]; !ok {
 						errs = append(errs, fmt.Sprintf("missing required arg %q", req))
 					}
 				}
 
-				// per-arg checks
-				reqSet := make(map[string]bool, len(schema.Required))
-				for _, r := range schema.Required {
-					reqSet[r] = true
+				// unknown args
+				for arg := range track.Args {
+					if _, ok := entry.properties[arg]; !ok && len(entry.properties) > 0 {
+						warns = append(warns, fmt.Sprintf("arg %q not in schema", arg))
+					}
 				}
 
-				for arg, val := range track.Args {
-					prop, known := schema.Properties[arg]
-					if !known && len(schema.Properties) > 0 {
-						warns = append(warns, fmt.Sprintf("arg %q not in schema", arg))
-						continue
+				// type validation via JSON Schema (skips template values)
+				if entry.raw != nil {
+					filtered := make(map[string]any)
+					for k, v := range track.Args {
+						if s, ok := v.(string); ok && templateKeyRe.MatchString(s) {
+							continue
+						}
+						filtered[k] = v
 					}
-					// skip type check for template values
-					if s, ok := val.(string); ok && templateKeyRe.MatchString(s) {
-						continue
-					}
-					if known && prop.Type != "" {
-						if typeErr := validateType(val, prop.Type); typeErr != nil {
-							errs = append(errs, fmt.Sprintf("arg %q: %v", arg, typeErr))
+					if len(filtered) > 0 {
+						var s jschema.Schema
+						if err := json.Unmarshal(entry.raw, &s); err == nil {
+							s.Required = nil // checked separately; don't fail on missing template args
+							if resolved, err := s.Resolve(nil); err == nil {
+								if valErr := resolved.Validate(filtered); valErr != nil {
+									errs = append(errs, valErr.Error())
+								}
+							}
 						}
 					}
 				}
@@ -135,14 +157,14 @@ Example:
 			}
 
 			if len(errs) == 0 && len(warns) == 0 {
-				fmt.Fprintf(os.Stdout, "%s  OK\n", prefix)
+				fmt.Fprintf(os.Stdout, "%s  %s\n", prefix, okLabel)
 			} else {
 				fmt.Fprintf(os.Stdout, "%s\n", prefix)
 				for _, e := range errs {
-					fmt.Fprintf(os.Stderr, "    ERROR %s\n", e)
+					fmt.Fprintf(os.Stderr, "    %s %s\n", errLabel, e)
 				}
 				for _, w := range warns {
-					fmt.Fprintf(os.Stderr, "    WARN  %s\n", w)
+					fmt.Fprintf(os.Stderr, "    %s %s\n", warnLabel, w)
 				}
 			}
 
@@ -156,49 +178,15 @@ Example:
 
 		fmt.Fprintln(os.Stdout)
 		if totalErrs == 0 && totalWarns == 0 {
-			fmt.Fprintf(os.Stdout, "all %d track(s) valid\n", len(c.Tracks))
+			fmt.Fprintf(os.Stdout, "%s\n", color.GreenString("all %d track(s) valid", len(c.Tracks)))
 			return nil
 		}
-		fmt.Fprintf(os.Stdout, "%d error(s), %d warning(s)\n", totalErrs, totalWarns)
+		fmt.Fprintf(os.Stdout, "%s\n", color.RedString("%d error(s)", totalErrs)+color.YellowString(", %d warning(s)", totalWarns))
 		if totalErrs > 0 {
 			return fmt.Errorf("%d validation error(s)", totalErrs)
 		}
 		return nil
 	},
-}
-
-func validateType(val any, schemaType string) error {
-	switch schemaType {
-	case "string":
-		if _, ok := val.(string); !ok {
-			return fmt.Errorf("expected string, got %T", val)
-		}
-	case "integer":
-		switch val.(type) {
-		case int, int64, float64:
-		default:
-			return fmt.Errorf("expected integer, got %T", val)
-		}
-	case "number":
-		switch val.(type) {
-		case int, int64, float64, float32:
-		default:
-			return fmt.Errorf("expected number, got %T", val)
-		}
-	case "boolean":
-		if _, ok := val.(bool); !ok {
-			return fmt.Errorf("expected boolean, got %T", val)
-		}
-	case "array":
-		if _, ok := val.([]any); !ok {
-			return fmt.Errorf("expected array, got %T", val)
-		}
-	case "object":
-		if _, ok := val.(map[string]any); !ok {
-			return fmt.Errorf("expected object, got %T", val)
-		}
-	}
-	return nil
 }
 
 func init() {

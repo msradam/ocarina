@@ -6,11 +6,19 @@ import (
 	"os"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/msradam/ocarina/internal/interp"
 	"github.com/msradam/ocarina/internal/mcpclient"
 	"github.com/msradam/ocarina/internal/playbook"
 	"github.com/spf13/cobra"
+)
+
+var (
+	boldCyan   = color.New(color.FgCyan, color.Bold).SprintfFunc()
+	green      = color.New(color.FgGreen).SprintfFunc()
+	red        = color.New(color.FgRed).SprintfFunc()
+	yellowPlay = color.New(color.FgYellow).SprintfFunc()
 )
 
 var playCmd = &cobra.Command{
@@ -53,7 +61,7 @@ Example:
 			if name == "" {
 				name = fmt.Sprintf("track %d", i+1)
 			}
-			fmt.Fprintf(os.Stdout, "==> %s (%s)\n", name, track.Tool)
+			fmt.Fprintf(os.Stdout, "%s %s\n", boldCyan("==>"), fmt.Sprintf("%s (%s)", name, track.Tool))
 
 			if dryRun {
 				fmt.Fprintf(os.Stdout, "    [dry-run] args: %v\n\n", track.Args)
@@ -73,7 +81,7 @@ Example:
 				Arguments: callArgs,
 			})
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "    error: %v\n\n", err)
+				fmt.Fprintf(os.Stderr, "    %s %v\n\n", red("error:"), err)
 				continue
 			}
 
@@ -101,7 +109,7 @@ Example:
 				if track.Grab != "" {
 					extracted, err := interp.Grab(captured, track.Grab)
 					if err != nil {
-						fmt.Fprintf(os.Stderr, "    grab: %v\n", err)
+						fmt.Fprintf(os.Stderr, "    %s %v\n", yellowPlay("grab:"), err)
 					} else {
 						captured = extracted
 					}
@@ -112,9 +120,9 @@ Example:
 			if track.Expect != nil && track.Expect.Contains != "" {
 				want := interp.Apply(track.Expect.Contains, notes).(string)
 				if strings.Contains(output, want) {
-					fmt.Fprintf(os.Stdout, "    PASS: contains %q\n", want)
+					fmt.Fprintf(os.Stdout, "    %s contains %q\n", green("PASS:"), want)
 				} else {
-					fmt.Fprintf(os.Stderr, "    FAIL: expected output to contain %q\n", want)
+					fmt.Fprintf(os.Stderr, "    %s expected output to contain %q\n", red("FAIL:"), want)
 					failures = append(failures, fmt.Sprintf("track %q: expected output to contain %q", name, want))
 				}
 			}
