@@ -1,8 +1,8 @@
-notes: {}
+keys: {}
 server:
   command: uvx
   args: ["geo-mcp"]
-tracks:
+rondo:
   - name: search GEO datasets
     tool: search_geo
     args:

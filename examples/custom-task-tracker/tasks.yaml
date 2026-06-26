@@ -2,7 +2,7 @@ server:
   command: uvx
   args: [--from, fastmcp, python3, /Users/amsrahman/ocarina/examples/custom-task-tracker/server.py]
 
-tracks:
+rondo:
   - name: add task 1 - Buy groceries
     tool: add_task
     args:

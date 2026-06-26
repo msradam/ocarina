@@ -1,4 +1,4 @@
-notes:
+keys:
   source: |
     # Hello World
 
@@ -12,7 +12,7 @@ server:
   command: npx
   args: ["-y", "mcp-pandoc"]
 
-tracks:
+rondo:
   - name: markdown to HTML
     tool: convert-contents
     args:

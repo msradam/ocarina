@@ -1,8 +1,8 @@
-notes: {}
+keys: {}
 server:
   command: uvx
   args: ["mcp-ollama"]
-tracks:
+rondo:
   - name: list installed models
     tool: list_models
     args: {}

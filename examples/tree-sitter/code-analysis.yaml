@@ -1,11 +1,11 @@
-notes:
+keys:
   target_file: /path/to/your/file.go
 
 server:
   command: uvx
   args: ["mcp-server-tree-sitter"]
 
-tracks:
+rondo:
   - name: list supported languages
     tool: list_languages
     args: {}

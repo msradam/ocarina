@@ -1,11 +1,11 @@
-notes:
+keys:
   pdf_path: /tmp/sample.pdf
 
 server:
   command: uvx
   args: ["pdf-mcp"]
 
-tracks:
+rondo:
   - name: document metadata
     tool: pdf_info
     args:

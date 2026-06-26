@@ -1,11 +1,11 @@
-notes:
+keys:
   start_url: https://modelcontextprotocol.io
 
 server:
   command: uvx
   args: ["mcp-server-fetch"]
 
-tracks:
+rondo:
   - name: fetch MCP homepage
     tool: fetch
     args:

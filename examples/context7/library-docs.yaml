@@ -1,11 +1,11 @@
-notes:
+keys:
   library: react
 
 server:
   command: npx
   args: ["-y", "@upstash/context7-mcp"]
 
-tracks:
+rondo:
   - name: resolve library ID
     tool: resolve-library-id
     args:

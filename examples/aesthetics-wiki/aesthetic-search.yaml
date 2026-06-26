@@ -1,10 +1,10 @@
-notes: {}
+keys: {}
 
 server:
   command: uvx
   args: ["aesthetics-wiki-mcp"]
 
-tracks:
+rondo:
   - name: search dark academia
     tool: search_aesthetic
     args:

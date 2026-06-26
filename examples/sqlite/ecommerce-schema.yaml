@@ -1,11 +1,11 @@
-notes:
+keys:
   db: /tmp/ocarina-ecommerce.db
 
 server:
   command: uvx
   args: ["mcp-server-sqlite", "--db-path", "{{db}}"]
 
-tracks:
+rondo:
   - name: create users table
     tool: write_query
     args:

@@ -1,8 +1,8 @@
-notes: {}
+keys: {}
 server:
   command: uvx
   args: ["semantic-scholar-mcp"]
-tracks:
+rondo:
   - name: search for papers
     tool: search_papers
     args:

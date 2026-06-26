@@ -5,14 +5,14 @@
 #
 # Shows: stateful multi-track workflows where each track builds on the last
 
-notes:
+keys:
   db: /tmp/ocarina-demo.db
 
 server:
   command: uvx
   args: [mcp-server-sqlite, --db-path, "{{db}}"]
 
-tracks:
+rondo:
   - name: create events table
     tool: create_table
     args:

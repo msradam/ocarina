@@ -1,4 +1,4 @@
-notes:
+keys:
   es_host: http://localhost:9200
 
 server:
@@ -7,7 +7,7 @@ server:
   env:
     ES_HOST: "{{es_host}}"
 
-tracks:
+rondo:
   - name: connect to cluster
     tool: connect
     args: {}

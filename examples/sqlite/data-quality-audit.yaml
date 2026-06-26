@@ -1,0 +1,93 @@
+keys:
+  db: /tmp/ocarina_demo.db
+
+server:
+  command: uvx
+  args: [mcp-server-sqlite, --db-path, "{{db}}"]
+
+rondo:
+  - name: list all tables
+    tool: list_tables
+    expect:
+      contains: users
+
+  - name: describe users schema
+    tool: describe_table
+    args:
+      table_name: users
+    expect:
+      contains: email
+
+  - name: describe orders schema
+    tool: describe_table
+    args:
+      table_name: orders
+    expect:
+      contains: status
+
+  - name: describe products schema
+    tool: describe_table
+    args:
+      table_name: products
+    expect:
+      contains: stock
+
+  - name: total user count
+    tool: read_query
+    args:
+      query: SELECT COUNT(*) AS total_users FROM users
+    expect:
+      contains: total_users
+
+  - name: inactive users
+    tool: read_query
+    args:
+      query: SELECT COUNT(*) AS inactive FROM users WHERE active = 0
+
+  - name: users missing email
+    tool: read_query
+    args:
+      query: SELECT COUNT(*) AS missing_email FROM users WHERE email IS NULL
+
+  - name: orders by status
+    tool: read_query
+    args:
+      query: SELECT status, COUNT(*) AS count FROM orders GROUP BY status
+    expect:
+      contains: pending
+
+  - name: zero or null amount orders
+    tool: read_query
+    args:
+      query: SELECT COUNT(*) AS bad_amounts FROM orders WHERE amount IS NULL OR amount <= 0
+
+  - name: out of stock products
+    tool: read_query
+    args:
+      query: SELECT name, price FROM products WHERE stock = 0
+    expect:
+      contains: Gadget
+
+  - name: revenue by order status
+    tool: read_query
+    args:
+      query: SELECT status, ROUND(SUM(amount), 2) AS revenue FROM orders GROUP BY status
+    expect:
+      contains: revenue
+
+  - name: top customers by spend
+    tool: read_query
+    args:
+      query: |
+        SELECT u.name, COUNT(o.id) AS order_count, ROUND(SUM(o.amount), 2) AS total_spent
+        FROM users u
+        LEFT JOIN orders o ON u.id = o.user_id
+        GROUP BY u.id
+        ORDER BY total_spent DESC
+    expect:
+      contains: total_spent
+
+  - name: record audit summary
+    tool: append_insight
+    args:
+      insight: "Audit complete: checked users, orders, products. Flagged missing emails, zero-amount orders, and out-of-stock products."

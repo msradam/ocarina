@@ -1,7 +1,7 @@
 # notes: defines values interpolated as {{key}} throughout all tracks
 # echo: captures a track's text output into a note for later tracks
 
-notes:
+keys:
   dir: /private/tmp/ocarina-demo
   filename: result.txt
 
@@ -9,7 +9,7 @@ server:
   command: npx
   args: [-y, "@modelcontextprotocol/server-filesystem", /private/tmp]
 
-tracks:
+rondo:
   - name: create working dir
     tool: create_directory
     args:

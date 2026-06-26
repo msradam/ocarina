@@ -1,11 +1,11 @@
-notes:
+keys:
   file: /tmp/sales.csv
 
 server:
   command: npx
   args: ["-y", "csv-mcp"]
 
-tracks:
+rondo:
   - name: read CSV file
     tool: read_csv
     args:

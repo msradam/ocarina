@@ -4,7 +4,7 @@
 #
 # Shows: notes: interpolation, sequential convert_time calls
 
-notes:
+keys:
   meeting_time: "15:00"
   base_tz: America/New_York
 
@@ -12,7 +12,7 @@ server:
   command: uvx
   args: [mcp-server-time]
 
-tracks:
+rondo:
   - name: current time in New York
     tool: get_current_time
     args:

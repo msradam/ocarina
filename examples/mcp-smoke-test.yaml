@@ -13,7 +13,7 @@ server:
   command: npx
   args: [-y, "@modelcontextprotocol/server-everything"]
 
-tracks:
+rondo:
   - name: echo round-trip
     tool: echo
     args:

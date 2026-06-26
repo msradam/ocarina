@@ -1,11 +1,11 @@
-notes:
+keys:
   target: /tmp/eslint-test/test.js
 
 server:
   command: npx
   args: ["-y", "@eslint/mcp"]
 
-tracks:
+rondo:
   - name: lint JavaScript file
     tool: lint-files
     args:

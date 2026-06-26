@@ -7,14 +7,14 @@
 # expect: assertions on the final synthesis step, and how a "thinking process"
 # becomes a replayable artifact.
 
-notes:
+keys:
   problem: "How should ocarina handle MCP servers that return non-JSON prose responses when grab: is used?"
 
 server:
   command: npx
   args: [-y, "@modelcontextprotocol/server-sequential-thinking"]
 
-tracks:
+rondo:
   - name: frame the problem
     tool: sequentialthinking
     args:

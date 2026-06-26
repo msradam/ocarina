@@ -1,10 +1,10 @@
-notes: {}
+keys: {}
 
 server:
   command: uvx
   args: ["mcp-dice"]
 
-tracks:
+rondo:
   - name: roll initiative
     tool: roll_dice
     args:

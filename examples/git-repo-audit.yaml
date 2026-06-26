@@ -4,14 +4,14 @@
 #
 # Shows: notes: for repo path, multi-track sequential inspection
 
-notes:
+keys:
   repo: /path/to/your/repo
 
 server:
   command: uvx
   args: [mcp-server-git, -r, "{{repo}}"]
 
-tracks:
+rondo:
   - name: recent commits
     tool: git_log
     args:

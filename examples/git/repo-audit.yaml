@@ -1,11 +1,11 @@
-notes:
+keys:
   repo: /tmp/ocarina-build
 
 server:
   command: uvx
   args: ["mcp-server-git"]
 
-tracks:
+rondo:
   - name: working tree status
     tool: git_status
     args:

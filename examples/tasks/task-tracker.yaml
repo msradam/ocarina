@@ -1,11 +1,11 @@
-notes:
+keys:
   file: /tmp/my-tasks.md
 
 server:
   command: npx
   args: ["-y", "mcp-tasks"]
 
-tracks:
+rondo:
   - name: initialize tasks file
     tool: tasks_setup
     args:

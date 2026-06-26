@@ -1,7 +1,7 @@
 # A reusable repo investigation cassette.
 # Swap notes.owner and notes.repo to investigate any public GitHub repo.
 
-notes:
+keys:
   owner: modelcontextprotocol
   repo: go-sdk
 
@@ -9,7 +9,7 @@ server:
   command: npx
   args: [-y, "@modelcontextprotocol/server-github"]
 
-tracks:
+rondo:
   - name: list recent commits
     tool: list_commits
     args:

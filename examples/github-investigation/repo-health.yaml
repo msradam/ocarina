@@ -1,4 +1,4 @@
-notes:
+keys:
   github_token: YOUR_GITHUB_PERSONAL_ACCESS_TOKEN
   owner: msradam
   repo: ocarina
@@ -9,7 +9,7 @@ server:
   env:
     GITHUB_PERSONAL_ACCESS_TOKEN: "{{github_token}}"
 
-tracks:
+rondo:
   - name: repository overview
     tool: get_repository
     args:

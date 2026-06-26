@@ -68,8 +68,8 @@ ocarina play session.yaml
 A cassette is a YAML file. Write one by hand or record it from a live session.
 
 ```yaml
-# Investigate any GitHub repo. Swap notes.owner and notes.repo to change repos.
-notes:
+# Investigate any GitHub repo. Swap keys.owner and keys.repo to change repos.
+keys:
   owner: modelcontextprotocol
   repo: go-sdk
 
@@ -77,14 +77,14 @@ server:
   command: npx
   args: [-y, "@modelcontextprotocol/server-github"]
 
-tracks:
+rondo:
   - name: list recent commits
     tool: list_commits
     args:
       owner: "{{owner}}"
       repo: "{{repo}}"
       per_page: 5
-    echo: commits_json      # capture output into notes
+    echo: commits_json      # capture output into keys
     grab: ".0.sha"          # extract first SHA from JSON array
 
   - name: show latest commit
@@ -107,8 +107,8 @@ tracks:
 | Field | Description |
 |---|---|
 | `tool` | Tool name to call |
-| `args` | Arguments. `{{key}}` interpolates from `notes`. |
-| `echo` | Capture text output into `notes` under this key |
+| `args` | Arguments. `{{key}}` interpolates from `keys`. |
+| `echo` | Capture text output into `keys` under this key |
 | `grab` | Dot-path into JSON output (`.0.sha`, `.name`), applied before `echo` captures |
 | `expect.contains` | Assert output contains this string. `play` exits non-zero if not. |
 | `result` | Recorded output, optional, kept for reference |
@@ -117,7 +117,7 @@ tracks:
 
 | Field | Description |
 |---|---|
-| `notes` | Static variables, interpolated as `{{key}}` throughout |
+| `keys` | Static variables, interpolated as `{{key}}` throughout |
 | `server` | Command and args to launch the MCP server |
 | `llm` | Captured `sampling/createMessage` exchanges from agentic servers |
 
@@ -137,7 +137,7 @@ Flags:
 
 ### `ocarina play <cassette.yaml>`
 
-Executes each track in order against the live server. No LLM involved. Notes from `echo:` feed into subsequent tracks. Exits non-zero if any `expect:` assertion fails.
+Executes each track in order against the live server. No LLM involved. Keys from `echo:` feed into subsequent tracks. Exits non-zero if any `expect:` assertion fails.
 
 ```bash
 ocarina play examples/github-investigation.yaml

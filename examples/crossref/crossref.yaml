@@ -1,8 +1,8 @@
-notes: {}
+keys: {}
 server:
   command: uvx
   args: ["crossref-mcp"]
-tracks:
+rondo:
   - name: ping server
     tool: ping
     args: {}

@@ -30,7 +30,7 @@ var validateCmd = &cobra.Command{
   - tool exists on the server
   - required args are present
   - arg types match the schema
-  - {{key}} references are defined in notes or set by a prior echo:
+  - {{key}} references are defined in keys or set by a prior echo:
 
 Exits non-zero if any errors are found.
 
@@ -45,8 +45,8 @@ Example:
 		}
 
 		ctx := context.Background()
-		serverArgs := interp.Strings(c.Server.Args, c.Notes)
-		serverEnv := interp.StringMap(c.Server.Env, c.Notes)
+		serverArgs := interp.Strings(c.Server.Args, c.Keys)
+		serverEnv := interp.StringMap(c.Server.Env, c.Keys)
 		sess, err := mcpclient.Connect(ctx, c.Server.Command, serverArgs, serverEnv)
 		if err != nil {
 			return fmt.Errorf("connect: %w", err)
@@ -85,15 +85,15 @@ Example:
 			schemas[t.Name] = entry
 		}
 
-		// data-flow: keys available via notes + prior echo: fields
+		// data-flow: keys available via keys + prior echo: fields
 		available := make(map[string]bool)
-		for k := range c.Notes {
+		for k := range c.Keys {
 			available[k] = true
 		}
 
 		var totalErrs, totalWarns int
 
-		for i, track := range c.Tracks {
+		for i, track := range c.Rondo {
 			name := track.Name
 			if name == "" {
 				name = fmt.Sprintf("track %d", i+1)
@@ -152,7 +152,7 @@ Example:
 				for _, m := range templateKeyRe.FindAllStringSubmatch(s, -1) {
 					key := m[1]
 					if !available[key] {
-						warns = append(warns, fmt.Sprintf("arg %q: {{%s}} not in notes and no prior track sets it via echo:", arg, key))
+						warns = append(warns, fmt.Sprintf("arg %q: {{%s}} not in keys and no prior track sets it via echo:", arg, key))
 					}
 				}
 			}
@@ -179,7 +179,7 @@ Example:
 
 		fmt.Fprintln(os.Stdout)
 		if totalErrs == 0 && totalWarns == 0 {
-			fmt.Fprintf(os.Stdout, "%s\n", color.GreenString("all %d track(s) valid", len(c.Tracks)))
+			fmt.Fprintf(os.Stdout, "%s\n", color.GreenString("all %d track(s) valid", len(c.Rondo)))
 			return nil
 		}
 		fmt.Fprintf(os.Stdout, "%s\n", color.RedString("%d error(s)", totalErrs)+color.YellowString(", %d warning(s)", totalWarns))

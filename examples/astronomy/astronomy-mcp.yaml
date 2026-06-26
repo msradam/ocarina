@@ -1,8 +1,8 @@
-notes: {}
+keys: {}
 server:
   command: uvx
   args: ["astronomy-mcp"]
-tracks:
+rondo:
   - name: search SIMBAD for M31
     tool: search_simbad_object
     args:

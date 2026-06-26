@@ -2,7 +2,7 @@ server:
   command: npx
   args: [-y, "@modelcontextprotocol/server-filesystem", /private/tmp]
 
-tracks:
+rondo:
   - name: list /tmp root
     tool: list_directory
     args:

@@ -1,10 +1,10 @@
-notes: {}
+keys: {}
 
 server:
   command: uvx
   args: ["mcp-hn"]
 
-tracks:
+rondo:
   - name: top 5 stories
     tool: get_stories
     args:

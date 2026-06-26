@@ -1,10 +1,10 @@
-notes: {}
+keys: {}
 
 server:
   command: uvx
   args: ["mcp-python-repl"]
 
-tracks:
+rondo:
   - name: load and summarize dataset
     tool: execute_python
     args:

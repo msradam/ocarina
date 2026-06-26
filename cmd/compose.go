@@ -46,7 +46,7 @@ Example:
 				Server: playbook.Server{Command: args[0], Args: args[1:]},
 			}
 			for _, t := range res.Tools {
-				c.Tracks = append(c.Tracks, playbook.Track{
+				c.Rondo = append(c.Rondo, playbook.Track{
 					Name: "call " + t.Name,
 					Tool: t.Name,
 				})

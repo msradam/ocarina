@@ -1,4 +1,4 @@
-notes: {}
+keys: {}
 
 server:
   command: uvx
@@ -6,7 +6,7 @@ server:
   env:
     CHROMA_CLIENT_TYPE: ephemeral
 
-tracks:
+rondo:
   - name: list collections
     tool: chroma_list_collections
     args: {}

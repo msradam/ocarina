@@ -1,4 +1,4 @@
-notes: {}
+keys: {}
 
 server:
   command: uvx
@@ -6,7 +6,7 @@ server:
   env:
     ES_HOST: http://localhost:9200
 
-tracks:
+rondo:
   - name: connect to cluster
     tool: connect
     args: {}

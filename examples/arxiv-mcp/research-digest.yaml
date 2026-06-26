@@ -1,0 +1,50 @@
+keys:
+  since: "2025-01-01"
+
+server:
+  command: uvx
+  args: [mcp-simple-arxiv]
+
+rondo:
+  - name: search MCP and tool use papers
+    tool: search_papers
+    args:
+      query: ti:"model context protocol" OR ti:"tool use" AND cat:cs.AI
+      max_results: 5
+      sort_by: submitted_date
+      date_from: "{{since}}"
+    expect:
+      contains: Authors
+
+  - name: search deterministic agent papers
+    tool: search_papers
+    args:
+      query: ti:"deterministic" AND cat:cs.AI AND ti:"agent"
+      max_results: 5
+      sort_by: submitted_date
+      date_from: "{{since}}"
+
+  - name: search LLM reproducibility papers
+    tool: search_papers
+    args:
+      query: ti:"reproducibility" AND cat:cs.LG
+      max_results: 5
+      sort_by: submitted_date
+      date_from: "{{since}}"
+    expect:
+      contains: Authors
+
+  - name: search agent testing and evaluation
+    tool: search_papers
+    args:
+      query: ti:"agent" AND ti:"evaluation" AND cat:cs.AI
+      max_results: 5
+      sort_by: submitted_date
+      date_from: "{{since}}"
+
+  - name: list cs.AI subcategories
+    tool: list_categories
+    args:
+      primary_category: cs
+    expect:
+      contains: cs.AI

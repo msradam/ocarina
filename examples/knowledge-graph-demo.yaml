@@ -6,14 +6,14 @@
 # Parameterize notes.project to model any software project's dependency graph.
 # Shows: create_entities, create_relations, search_nodes, open_nodes, delete_entities.
 
-notes:
+keys:
   project: ocarina
 
 server:
   command: npx
   args: [-y, "@modelcontextprotocol/server-memory"]
 
-tracks:
+rondo:
   - name: create core entities
     tool: create_entities
     args:

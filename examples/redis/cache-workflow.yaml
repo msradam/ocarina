@@ -1,4 +1,4 @@
-notes:
+keys:
   prefix: "ocarina"
 
 server:
@@ -7,7 +7,7 @@ server:
   env:
     REDIS_URL: redis://localhost:6379
 
-tracks:
+rondo:
   - name: cache a value
     tool: set
     args:

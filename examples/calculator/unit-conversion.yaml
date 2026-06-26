@@ -1,11 +1,11 @@
-notes:
+keys:
   miles: "26.2188"
 
 server:
   command: uvx
   args: ["mcp-server-calculator"]
 
-tracks:
+rondo:
   - name: marathon distance in kilometers
     tool: calculate
     args:

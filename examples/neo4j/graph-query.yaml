@@ -1,4 +1,4 @@
-notes:
+keys:
   neo4j_uri: bolt://localhost:7687
 
 server:
@@ -7,7 +7,7 @@ server:
   env:
     NEO4J_URI: "{{neo4j_uri}}"
 
-tracks:
+rondo:
   - name: create people nodes
     tool: write_neo4j_cypher
     args:

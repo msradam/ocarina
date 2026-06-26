@@ -27,8 +27,8 @@ var playCmd = &cobra.Command{
 	Long: `Executes each track in the cassette by calling the specified tool
 with the given arguments. No LLM involved — purely deterministic replay.
 
-notes: values are interpolated as {{key}} throughout all track args.
-echo: captures a track's text output into a note for use in later tracks.
+keys: values are interpolated as {{key}} throughout all track args.
+echo: captures a track's text output into a key for use in later tracks.
 
 Example:
   ocarina play session.yaml
@@ -41,7 +41,7 @@ Example:
 		}
 
 		notes := make(map[string]string)
-		for k, v := range c.Notes {
+		for k, v := range c.Keys {
 			notes[k] = v
 		}
 
@@ -57,7 +57,7 @@ Example:
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		var failures []string
 
-		for i, track := range c.Tracks {
+		for i, track := range c.Rondo {
 			name := track.Name
 			if name == "" {
 				name = fmt.Sprintf("track %d", i+1)

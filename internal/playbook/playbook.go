@@ -7,9 +7,9 @@ import (
 )
 
 type Cassette struct {
-	Notes  map[string]string `yaml:"notes,omitempty"`
+	Keys   map[string]string `yaml:"keys,omitempty"`
 	Server Server            `yaml:"server"`
-	Tracks []Track           `yaml:"tracks"`
+	Rondo  []Track           `yaml:"rondo"`
 	LLM    []LLMRound        `yaml:"llm,omitempty"`
 }
 

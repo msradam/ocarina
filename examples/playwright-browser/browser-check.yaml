@@ -1,11 +1,11 @@
-notes:
+keys:
   target_url: https://example.com
 
 server:
   command: npx
   args: ["-y", "@playwright/mcp"]
 
-tracks:
+rondo:
   - name: navigate to page
     tool: browser_navigate
     args:

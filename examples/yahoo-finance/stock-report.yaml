@@ -1,11 +1,11 @@
-notes:
+keys:
   ticker: AAPL
 
 server:
   command: uvx
   args: ["mcp-yahoo-finance"]
 
-tracks:
+rondo:
   - name: current price
     tool: get_current_stock_price
     args:

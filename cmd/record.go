@@ -141,7 +141,7 @@ and writes a cassette when the session ends.`,
 					}
 				}
 			}
-			c.Tracks = append(c.Tracks, track)
+			c.Rondo = append(c.Rondo, track)
 		}
 
 		for _, sc := range sampled {
@@ -151,7 +151,7 @@ and writes a cassette when the session ends.`,
 		if err := playbook.Save(output, c); err != nil {
 			return fmt.Errorf("save cassette: %w", err)
 		}
-		msg := fmt.Sprintf("ocarina: recorded %d track(s)", len(c.Tracks))
+		msg := fmt.Sprintf("ocarina: recorded %d track(s)", len(c.Rondo))
 		if len(c.LLM) > 0 {
 			msg += fmt.Sprintf(", %d llm round(s)", len(c.LLM))
 		}

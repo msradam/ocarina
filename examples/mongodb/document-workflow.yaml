@@ -1,4 +1,4 @@
-notes:
+keys:
   db: testdb
   collection: products
 
@@ -8,7 +8,7 @@ server:
   env:
     MDB_MCP_CONNECTION_STRING: mongodb://admin:testpass@localhost:27017
 
-tracks:
+rondo:
   - name: list databases
     tool: list-databases
     args: {}

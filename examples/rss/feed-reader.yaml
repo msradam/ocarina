@@ -1,11 +1,11 @@
-notes:
+keys:
   feed_url: https://hnrss.org/frontpage
 
 server:
   command: uvx
   args: ["mcp-server-rss"]
 
-tracks:
+rondo:
   - name: fetch HN RSS feed
     tool: feed
     args:

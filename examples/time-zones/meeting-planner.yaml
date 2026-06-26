@@ -1,4 +1,4 @@
-notes:
+keys:
   meeting_time: "14:00"
   source_tz: America/New_York
 
@@ -6,7 +6,7 @@ server:
   command: uvx
   args: ["mcp-server-time", "--local-timezone", "{{source_tz}}"]
 
-tracks:
+rondo:
   - name: current time in New York
     tool: get_current_time
     args:

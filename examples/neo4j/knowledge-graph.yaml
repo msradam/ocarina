@@ -1,4 +1,4 @@
-notes: {}
+keys: {}
 
 server:
   command: uvx
@@ -6,7 +6,7 @@ server:
   env:
     NEO4J_URI: bolt://localhost:7687
 
-tracks:
+rondo:
   - name: create people graph
     tool: write_neo4j_cypher
     args:

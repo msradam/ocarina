@@ -1,8 +1,8 @@
-notes: {}
+keys: {}
 server:
   command: uvx
   args: ["arxiv-mcp-server"]
-tracks:
+rondo:
   - name: search arxiv papers
     tool: search_papers
     args:

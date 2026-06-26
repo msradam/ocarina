@@ -1,10 +1,10 @@
-notes: {}
+keys: {}
 
 server:
   command: uvx
   args: ["plant-genomics-mcp"]
 
-tracks:
+rondo:
   - name: lookup Arabidopsis locus AT1G01010
     tool: ensembl_plants_lookup_locus
     args:

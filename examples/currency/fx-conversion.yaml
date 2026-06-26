@@ -1,4 +1,4 @@
-notes:
+keys:
   amount: "1000"
   base: USD
 
@@ -6,7 +6,7 @@ server:
   command: uvx
   args: ["mcp-currency"]
 
-tracks:
+rondo:
   - name: USD to EUR rate
     tool: get_currency_conversion_rate
     args:

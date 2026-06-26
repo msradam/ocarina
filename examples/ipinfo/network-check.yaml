@@ -1,10 +1,10 @@
-notes: {}
+keys: {}
 
 server:
   command: uvx
   args: ["mcp-server-ipinfo"]
 
-tracks:
+rondo:
   - name: my current IP and location
     tool: ipinfo_lookup_my_ip
     args: {}

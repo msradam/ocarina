@@ -1,11 +1,11 @@
-notes:
+keys:
   conn: postgresql://postgres:testpass@localhost:5432/testdb
 
 server:
   command: npx
   args: ["-y", "@modelcontextprotocol/server-postgres", "{{conn}}"]
 
-tracks:
+rondo:
   - name: check connection and version
     tool: query
     args:

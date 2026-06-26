@@ -1,4 +1,4 @@
-notes:
+keys:
   principal: "10000"
   rate: "0.07"
   years: "10"
@@ -7,7 +7,7 @@ server:
   command: uvx
   args: ["mcp-server-math"]
 
-tracks:
+rondo:
   - name: annual interest amount
     tool: multiply
     args:

@@ -1,0 +1,82 @@
+keys:
+  start: "2025-01-01"
+  end: "2025-12-31"
+
+server:
+  command: uvx
+  args: [mcp-yahoo-finance]
+
+rondo:
+  - name: AAPL current price
+    tool: get_current_stock_price
+    args:
+      symbol: AAPL
+    expect:
+      contains: "."
+
+  - name: MSFT current price
+    tool: get_current_stock_price
+    args:
+      symbol: MSFT
+    expect:
+      contains: "."
+
+  - name: NVDA current price
+    tool: get_current_stock_price
+    args:
+      symbol: NVDA
+    expect:
+      contains: "."
+
+  - name: AAPL YTD performance
+    tool: get_stock_price_date_range
+    args:
+      symbol: AAPL
+      start_date: "{{start}}"
+      end_date: "{{end}}"
+    expect:
+      contains: "2025-01"
+
+  - name: NVDA YTD performance
+    tool: get_stock_price_date_range
+    args:
+      symbol: NVDA
+      start_date: "{{start}}"
+      end_date: "{{end}}"
+    expect:
+      contains: "2025-01"
+
+  - name: AAPL income statement
+    tool: get_income_statement
+    args:
+      symbol: AAPL
+    expect:
+      contains: Revenue
+
+  - name: MSFT income statement
+    tool: get_income_statement
+    args:
+      symbol: MSFT
+    expect:
+      contains: Revenue
+
+  - name: NVDA income statement
+    tool: get_income_statement
+    args:
+      symbol: NVDA
+    expect:
+      contains: Revenue
+
+  - name: AAPL dividends
+    tool: get_dividends
+    args:
+      symbol: AAPL
+    expect:
+      contains: "0."
+
+  - name: AAPL analyst recommendations
+    tool: get_recommendations
+    args:
+      symbol: AAPL
+    expect:
+      contains: strongBuy

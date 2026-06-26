@@ -1,8 +1,8 @@
-notes: {}
+keys: {}
 server:
   command: npx
   args: ["-y", "apiverket-mcp-server"]
-tracks:
+rondo:
   - name: discover weather endpoints
     tool: govdata_discover
     args:

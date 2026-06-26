@@ -1,8 +1,8 @@
-notes: {}
+keys: {}
 server:
   command: uvx
   args: ["mcp-simple-timeserver"]
-tracks:
+rondo:
   - name: get UTC time
     tool: get_utc
     args: {}

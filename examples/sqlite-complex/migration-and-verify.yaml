@@ -9,14 +9,14 @@
 # The echo chain (tracks 8 -> 12) captures a count snapshot and
 # verifies it is unchanged after all read operations.
 
-notes:
+keys:
   db: /tmp/ocarina-test-complex.db
 
 server:
   command: uvx
   args: [mcp-server-sqlite, --db-path, "{{db}}"]
 
-tracks:
+rondo:
   - name: create users table
     tool: create_table
     args:

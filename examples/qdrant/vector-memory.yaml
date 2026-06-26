@@ -1,4 +1,4 @@
-notes:
+keys:
   qdrant_url: http://localhost:6333
   collection: ocarina-demo
 
@@ -9,7 +9,7 @@ server:
     QDRANT_URL: "{{qdrant_url}}"
     COLLECTION_NAME: "{{collection}}"
 
-tracks:
+rondo:
   - name: store a fact
     tool: qdrant-store
     args:

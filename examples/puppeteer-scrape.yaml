@@ -9,14 +9,14 @@
 # Note: puppeteer_screenshot returns base64 image data — ocarina prints
 # "[image ...]" for non-text content rather than dumping binary.
 
-notes:
+keys:
   url: https://example.com
 
 server:
   command: npx
   args: [-y, "@modelcontextprotocol/server-puppeteer"]
 
-tracks:
+rondo:
   - name: navigate to page
     tool: puppeteer_navigate
     args:

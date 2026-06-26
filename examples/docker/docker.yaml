@@ -1,8 +1,8 @@
-notes: {}
+keys: {}
 server:
   command: uvx
   args: ["docker-mcp"]
-tracks:
+rondo:
   - name: list containers
     tool: list-containers
     args: {}

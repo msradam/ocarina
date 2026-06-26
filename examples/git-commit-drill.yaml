@@ -5,7 +5,7 @@
 # The git_log / git_show tools return human-readable text, not JSON,
 # so grab: is not used here — echo: captures the full text output.
 
-notes:
+keys:
   repo: /path/to/your/repo
   target_branch: HEAD~1
 
@@ -13,7 +13,7 @@ server:
   command: uvx
   args: [mcp-server-git, -r, "{{repo}}"]
 
-tracks:
+rondo:
   - name: recent commits
     tool: git_log
     args:

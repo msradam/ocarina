@@ -1,8 +1,8 @@
-notes: {}
+keys: {}
 server:
   command: uvx
   args: ["mcp-abacus"]
-tracks:
+rondo:
   - name: get server info
     tool: info
     args: {}
