@@ -1,0 +1,10 @@
+notes: {}
+server:
+  command: uvx
+  args: ["mcp-ollama"]
+tracks:
+  - name: list installed models
+    tool: list_models
+    args: {}
+    expect:
+      contains: name

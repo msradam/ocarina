@@ -1,0 +1,23 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["chroma-mcp"]
+  env:
+    CHROMA_CLIENT_TYPE: ephemeral
+
+tracks:
+  - name: list collections
+    tool: chroma_list_collections
+    args: {}
+
+  - name: create collection
+    tool: chroma_create_collection
+    args:
+      name: ocarina_test
+
+  - name: list collections again
+    tool: chroma_list_collections
+    args: {}
+    expect:
+      contains: ocarina_test

@@ -1,0 +1,12 @@
+notes: {}
+server:
+  command: uvx
+  args: ["geo-mcp"]
+tracks:
+  - name: search GEO datasets
+    tool: search_geo
+    args:
+      term: CRISPR cancer
+      retmax: 3
+    expect:
+      contains: GSE

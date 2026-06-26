@@ -1,0 +1,12 @@
+notes: {}
+server:
+  command: npx
+  args: ["-y", "wikidata-mcp"]
+tracks:
+  - name: search for Albert Einstein
+    tool: search_wikidata_entity
+    args:
+      query: Albert Einstein
+      limit: 3
+    expect:
+      contains: Q937

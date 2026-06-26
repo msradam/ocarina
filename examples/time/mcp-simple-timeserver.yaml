@@ -1,0 +1,10 @@
+notes: {}
+server:
+  command: uvx
+  args: ["mcp-simple-timeserver"]
+tracks:
+  - name: get UTC time
+    tool: get_utc
+    args: {}
+    expect:
+      contains: UTC

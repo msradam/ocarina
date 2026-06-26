@@ -1,0 +1,17 @@
+notes: {}
+server:
+  command: uvx
+  args: ["crossref-mcp"]
+tracks:
+  - name: ping server
+    tool: ping
+    args: {}
+    expect:
+      contains: crossref
+  - name: search works
+    tool: search_works
+    args:
+      query: model context protocol
+      rows: 3
+    expect:
+      contains: doi

@@ -1,0 +1,12 @@
+notes: {}
+server:
+  command: uvx
+  args: ["arxiv-mcp-server"]
+tracks:
+  - name: search arxiv papers
+    tool: search_papers
+    args:
+      query: "model context protocol"
+      max_results: 3
+    expect:
+      contains: arxiv

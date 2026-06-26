@@ -1,0 +1,11 @@
+notes: {}
+server:
+  command: npx
+  args: ["-y", "apiverket-mcp-server"]
+tracks:
+  - name: discover weather endpoints
+    tool: govdata_discover
+    args:
+      query: weather
+    expect:
+      contains: weather

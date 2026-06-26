@@ -1,0 +1,8 @@
+notes: {}
+server:
+  command: uvx
+  args: ["docker-mcp"]
+tracks:
+  - name: list containers
+    tool: list-containers
+    args: {}

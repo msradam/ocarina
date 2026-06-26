@@ -1,0 +1,12 @@
+notes: {}
+server:
+  command: uvx
+  args: ["semantic-scholar-mcp"]
+tracks:
+  - name: search for papers
+    tool: search_papers
+    args:
+      query: model context protocol MCP
+      limit: 3
+    expect:
+      contains: paper_id

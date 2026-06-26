@@ -1,0 +1,16 @@
+notes: {}
+server:
+  command: uvx
+  args: ["mcp-abacus"]
+tracks:
+  - name: get server info
+    tool: info
+    args: {}
+    expect:
+      contains: mcp-abacus
+  - name: calculate sum
+    tool: calculate
+    args:
+      expression: "42 + 58"
+    expect:
+      contains: "100"

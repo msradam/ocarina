@@ -1,0 +1,10 @@
+notes: {}
+server:
+  command: npx
+  args: ["-y", "mermaid-mcp-server"]
+tracks:
+  - name: list diagrams
+    tool: list_diagrams
+    args: {}
+    expect:
+      contains: flowchart

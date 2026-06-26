@@ -1,0 +1,11 @@
+notes: {}
+server:
+  command: npx
+  args: ["-y", "mcp-json"]
+tracks:
+  - name: find JSON files
+    tool: find_json_files
+    args:
+      directory: /tmp
+    expect:
+      contains: json

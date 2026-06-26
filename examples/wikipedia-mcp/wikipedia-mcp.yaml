@@ -1,0 +1,12 @@
+notes: {}
+server:
+  command: uvx
+  args: ["wikipedia-mcp"]
+tracks:
+  - name: search Wikipedia
+    tool: search_wikipedia
+    args:
+      query: Albert Einstein
+      limit: 3
+    expect:
+      contains: Einstein

@@ -1,0 +1,10 @@
+notes: {}
+server:
+  command: uvx
+  args: ["mcp-server-trello"]
+tracks:
+  - name: get version
+    tool: get_version
+    args: {}
+    expect:
+      contains: "version"

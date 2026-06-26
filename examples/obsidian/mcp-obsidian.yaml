@@ -1,0 +1,11 @@
+notes: {}
+server:
+  command: npx
+  args: ["-y", "mcp-obsidian", "/tmp"]
+tracks:
+  - name: search notes
+    tool: search_notes
+    args:
+      query: ocarina
+    expect:
+      contains: No matches
