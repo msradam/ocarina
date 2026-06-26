@@ -1,0 +1,35 @@
+notes:
+  es_host: http://localhost:9200
+
+server:
+  command: uvx
+  args: ["--with", "aiohttp", "elasticsearch-mcp"]
+  env:
+    ES_HOST: "{{es_host}}"
+
+tracks:
+  - name: connect to cluster
+    tool: connect
+    args: {}
+    expect:
+      contains: connected
+
+  - name: cluster health
+    tool: cluster_health
+    args: {}
+    expect:
+      contains: status
+
+  - name: cluster statistics
+    tool: cluster_stats
+    args: {}
+    expect:
+      contains: nodes
+
+  - name: list node info
+    tool: list_nodes
+    args: {}
+
+  - name: list indices
+    tool: list_indices
+    args: {}
