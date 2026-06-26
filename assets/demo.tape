@@ -8,13 +8,17 @@ Set Height 650
 Set TypingSpeed 50ms
 Set PlaybackSpeed 0.8
 
-Sleep 500ms
-Type "export PATH=/Users/amsrahman/bin:/opt/homebrew/bin:$PATH && cd /Users/amsrahman/ocarina"
+Hide
+Type "export PATH=/Users/amsrahman/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 Enter
-Sleep 300ms
+Sleep 100ms
+Type "unsetopt PROMPT_CR PROMPT_SP && cd /Users/amsrahman/ocarina"
+Enter
+Sleep 100ms
 Type "clear"
 Enter
 Sleep 500ms
+Show
 
 Type "ocarina compose uvx mcp-server-time"
 Sleep 300ms
