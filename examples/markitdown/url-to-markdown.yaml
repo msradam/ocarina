@@ -1,0 +1,21 @@
+notes:
+  url: https://modelcontextprotocol.io
+
+server:
+  command: uvx
+  args: ["markitdown-mcp"]
+
+tracks:
+  - name: convert MCP homepage to markdown
+    tool: convert_to_markdown
+    args:
+      uri: "{{url}}"
+    expect:
+      contains: Model Context Protocol
+
+  - name: convert example.com
+    tool: convert_to_markdown
+    args:
+      uri: https://example.com
+    expect:
+      contains: Example Domain

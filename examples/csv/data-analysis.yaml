@@ -1,0 +1,14 @@
+notes:
+  file: /tmp/sales.csv
+
+server:
+  command: npx
+  args: ["-y", "csv-mcp"]
+
+tracks:
+  - name: read CSV file
+    tool: read_csv
+    args:
+      filepath: "{{file}}"
+    expect:
+      contains: name

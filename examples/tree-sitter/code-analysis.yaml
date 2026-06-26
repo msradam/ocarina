@@ -1,0 +1,18 @@
+notes:
+  target_file: /path/to/your/file.go
+
+server:
+  command: uvx
+  args: ["mcp-server-tree-sitter"]
+
+tracks:
+  - name: list supported languages
+    tool: list_languages
+    args: {}
+    expect:
+      contains: python
+
+  - name: extract symbols from file
+    tool: get_symbols
+    args:
+      path: "{{target_file}}"
