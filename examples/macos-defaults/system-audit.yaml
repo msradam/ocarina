@@ -1,0 +1,24 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["mcp-server-macos-defaults"]
+
+tracks:
+  - name: list all preference domains
+    tool: list-domains
+    args: {}
+    expect:
+      contains: com.apple
+
+  - name: read Dock preferences
+    tool: read-domain
+    args:
+      domain: com.apple.dock
+    expect:
+      contains: tilesize
+
+  - name: read Finder preferences
+    tool: read-domain
+    args:
+      domain: com.apple.finder

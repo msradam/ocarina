@@ -1,0 +1,30 @@
+notes: {}
+
+server:
+  command: npx
+  args: ["-y", "mcp-shell"]
+
+tracks:
+  - name: kernel and architecture
+    tool: run_command
+    args:
+      command: uname -a
+    expect:
+      contains: Darwin
+
+  - name: disk usage
+    tool: run_command
+    args:
+      command: df -h /
+
+  - name: system uptime
+    tool: run_command
+    args:
+      command: uptime
+
+  - name: cpu info
+    tool: run_command
+    args:
+      command: sysctl -n machdep.cpu.brand_string
+    expect:
+      contains: Apple

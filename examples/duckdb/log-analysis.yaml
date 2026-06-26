@@ -1,0 +1,45 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["mcp-server-duckdb"]
+
+tracks:
+  - name: create log table
+    tool: query
+    args:
+      sql: |
+        CREATE TABLE logs AS
+        SELECT * FROM (VALUES
+          ('2024-03-01 08:12:33', 'INFO',  '/api/users',    200, 42),
+          ('2024-03-01 08:13:01', 'ERROR', '/api/orders',   500, 1203),
+          ('2024-03-01 08:13:45', 'INFO',  '/api/products', 200, 88),
+          ('2024-03-01 08:14:02', 'WARN',  '/api/users',    429, 15),
+          ('2024-03-01 08:14:55', 'ERROR', '/api/checkout', 503, 9841),
+          ('2024-03-01 08:15:10', 'INFO',  '/api/users',    200, 37)
+        ) t(ts, level, path, status, latency_ms)
+
+  - name: error rate by endpoint
+    tool: query
+    args:
+      sql: |
+        SELECT path,
+               COUNT(*) as total,
+               SUM(CASE WHEN level = 'ERROR' THEN 1 ELSE 0 END) as errors,
+               AVG(latency_ms) as avg_latency_ms
+        FROM logs
+        GROUP BY path
+        ORDER BY errors DESC
+    expect:
+      contains: ERROR
+
+  - name: slowest requests
+    tool: query
+    args:
+      sql: |
+        SELECT ts, path, status, latency_ms
+        FROM logs
+        WHERE latency_ms > 100
+        ORDER BY latency_ms DESC
+    expect:
+      contains: "9841"

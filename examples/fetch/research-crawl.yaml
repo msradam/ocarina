@@ -1,0 +1,29 @@
+notes:
+  start_url: https://modelcontextprotocol.io
+
+server:
+  command: uvx
+  args: ["mcp-server-fetch"]
+
+tracks:
+  - name: fetch MCP homepage
+    tool: fetch
+    args:
+      url: "{{start_url}}"
+    expect:
+      contains: Model Context Protocol
+
+  - name: fetch spec overview
+    tool: fetch
+    args:
+      url: https://spec.modelcontextprotocol.io
+    expect:
+      contains: protocol
+
+  - name: fetch example.com as plaintext
+    tool: fetch
+    args:
+      url: https://example.com
+      raw: false
+    expect:
+      contains: Example Domain

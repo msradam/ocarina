@@ -1,0 +1,52 @@
+notes: {}
+
+server:
+  command: npx
+  args: ["-y", "@modelcontextprotocol/server-memory"]
+
+tracks:
+  - name: create people and companies
+    tool: create_entities
+    args:
+      entities:
+        - name: Alice Chen
+          entityType: person
+          observations:
+            - "Staff engineer at Acme Corp"
+            - "Specializes in distributed systems"
+        - name: Bob Kumar
+          entityType: person
+          observations:
+            - "Engineering manager at Acme Corp"
+        - name: Acme Corp
+          entityType: company
+          observations:
+            - "B2B SaaS company, 200 employees"
+
+  - name: add relationships
+    tool: add_relations
+    args:
+      relations:
+        - from: Alice Chen
+          to: Acme Corp
+          relationType: works_at
+        - from: Bob Kumar
+          to: Acme Corp
+          relationType: works_at
+        - from: Alice Chen
+          to: Bob Kumar
+          relationType: reports_to
+
+  - name: search for engineers
+    tool: search_nodes
+    args:
+      query: distributed systems engineer
+    expect:
+      contains: Alice
+
+  - name: open Alice's full node
+    tool: open_nodes
+    args:
+      names: ["Alice Chen"]
+    expect:
+      contains: Acme Corp

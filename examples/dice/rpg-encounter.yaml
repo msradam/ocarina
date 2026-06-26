@@ -1,0 +1,30 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["mcp-dice"]
+
+tracks:
+  - name: roll initiative
+    tool: roll_dice
+    args:
+      notation: 1d20
+    expect:
+      contains: result
+
+  - name: roll attack damage
+    tool: roll_dice
+    args:
+      notation: 2d6+3
+
+  - name: roll saving throw
+    tool: roll_dice
+    args:
+      notation: 1d20+2
+
+  - name: roll fireball damage
+    tool: roll_dice
+    args:
+      notation: 8d6
+    expect:
+      contains: result

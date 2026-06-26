@@ -1,0 +1,25 @@
+notes:
+  repo: /tmp/ocarina-build
+
+server:
+  command: uvx
+  args: ["mcp-server-git"]
+
+tracks:
+  - name: working tree status
+    tool: git_status
+    args:
+      repo_path: "{{repo}}"
+
+  - name: last 10 commits
+    tool: git_log
+    args:
+      repo_path: "{{repo}}"
+      max_count: 10
+    expect:
+      contains: commit
+
+  - name: diff against HEAD
+    tool: git_diff
+    args:
+      repo_path: "{{repo}}"

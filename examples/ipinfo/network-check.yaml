@@ -1,0 +1,26 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["mcp-server-ipinfo"]
+
+tracks:
+  - name: my current IP and location
+    tool: ipinfo_lookup_my_ip
+    args: {}
+    expect:
+      contains: country
+
+  - name: lookup Google DNS
+    tool: ipinfo_lookup_ip
+    args:
+      ip_address: "8.8.8.8"
+    expect:
+      contains: Google
+
+  - name: lookup Cloudflare DNS
+    tool: ipinfo_lookup_ip
+    args:
+      ip_address: "1.1.1.1"
+    expect:
+      contains: Cloudflare

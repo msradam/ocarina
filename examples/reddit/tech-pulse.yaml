@@ -1,0 +1,23 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["mcp-server-reddit"]
+
+tracks:
+  - name: r/programming frontpage
+    tool: get_subreddit_posts
+    args:
+      subreddit: programming
+    expect:
+      contains: title
+
+  - name: r/golang frontpage
+    tool: get_subreddit_posts
+    args:
+      subreddit: golang
+
+  - name: search for MCP posts
+    tool: search_posts
+    args:
+      query: "model context protocol"

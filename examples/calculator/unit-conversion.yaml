@@ -1,0 +1,30 @@
+notes:
+  miles: "26.2188"
+
+server:
+  command: uvx
+  args: ["mcp-server-calculator"]
+
+tracks:
+  - name: marathon distance in kilometers
+    tool: calculate
+    args:
+      expression: "{{miles}} * 1.60934"
+    echo: km
+    expect:
+      contains: "42"
+
+  - name: kilometers to meters
+    tool: calculate
+    args:
+      expression: "{{km}} * 1000"
+    echo: meters
+    expect:
+      contains: "42"
+
+  - name: meters to centimeters
+    tool: calculate
+    args:
+      expression: "{{meters}} * 100"
+    expect:
+      contains: "4219"

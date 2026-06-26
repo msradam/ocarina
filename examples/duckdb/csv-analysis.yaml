@@ -1,0 +1,44 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["mcp-server-duckdb"]
+
+tracks:
+  - name: create sales table
+    tool: query
+    args:
+      sql: |
+        CREATE TABLE sales AS
+        SELECT * FROM (VALUES
+          ('2024-01', 'North', 42000),
+          ('2024-01', 'South', 31000),
+          ('2024-02', 'North', 48000),
+          ('2024-02', 'South', 35000),
+          ('2024-03', 'North', 51000),
+          ('2024-03', 'South', 40000)
+        ) t(month, region, revenue)
+
+  - name: total revenue by region
+    tool: query
+    args:
+      sql: |
+        SELECT region, SUM(revenue) as total, AVG(revenue) as avg_monthly
+        FROM sales
+        GROUP BY region
+        ORDER BY total DESC
+    expect:
+      contains: North
+
+  - name: month over month growth
+    tool: query
+    args:
+      sql: |
+        SELECT month,
+               SUM(revenue) as total,
+               SUM(revenue) - LAG(SUM(revenue)) OVER (ORDER BY month) as growth
+        FROM sales
+        GROUP BY month
+        ORDER BY month
+    expect:
+      contains: "2024-01"

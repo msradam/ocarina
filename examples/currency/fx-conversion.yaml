@@ -1,0 +1,37 @@
+notes:
+  amount: "1000"
+  base: USD
+
+server:
+  command: uvx
+  args: ["mcp-currency"]
+
+tracks:
+  - name: USD to EUR rate
+    tool: get_currency_conversion_rate
+    args:
+      from_currency: "{{base}}"
+      to_currency: EUR
+    expect:
+      contains: EUR
+
+  - name: USD to GBP rate
+    tool: get_currency_conversion_rate
+    args:
+      from_currency: "{{base}}"
+      to_currency: GBP
+
+  - name: USD to JPY rate
+    tool: get_currency_conversion_rate
+    args:
+      from_currency: "{{base}}"
+      to_currency: JPY
+
+  - name: convert amount to EUR
+    tool: convert_currency
+    args:
+      amount: "{{amount}}"
+      from_currency: "{{base}}"
+      to_currency: EUR
+    expect:
+      contains: EUR

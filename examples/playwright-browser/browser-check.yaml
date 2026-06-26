@@ -1,0 +1,18 @@
+notes:
+  target_url: https://example.com
+
+server:
+  command: npx
+  args: ["-y", "@playwright/mcp"]
+
+tracks:
+  - name: navigate to page
+    tool: browser_navigate
+    args:
+      url: "{{target_url}}"
+
+  - name: snapshot accessibility tree
+    tool: browser_snapshot
+    args: {}
+    expect:
+      contains: Example

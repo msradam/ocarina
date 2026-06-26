@@ -1,0 +1,43 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["mcp-python-repl"]
+
+tracks:
+  - name: load and summarize dataset
+    tool: execute_python
+    args:
+      code: |
+        data = [
+            {"name": "Alice", "sales": 142000, "region": "North"},
+            {"name": "Bob",   "sales":  98000, "region": "South"},
+            {"name": "Carol", "sales": 176000, "region": "North"},
+            {"name": "Dave",  "sales": 115000, "region": "West"},
+        ]
+        total = sum(r["sales"] for r in data)
+        avg = total / len(data)
+        f"total={total}, avg={avg:.0f}"
+    expect:
+      contains: "531000"
+
+  - name: top performer
+    tool: execute_python
+    args:
+      code: |
+        top = max(data, key=lambda r: r["sales"])
+        f"{top['name']} ({top['region']}): ${top['sales']:,}"
+    expect:
+      contains: Carol
+
+  - name: revenue by region
+    tool: execute_python
+    args:
+      code: |
+        from collections import defaultdict
+        by_region = defaultdict(int)
+        for r in data:
+            by_region[r["region"]] += r["sales"]
+        dict(sorted(by_region.items(), key=lambda x: -x[1]))
+    expect:
+      contains: North

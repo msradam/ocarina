@@ -1,0 +1,37 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["mcp-python-repl"]
+
+tracks:
+  - name: define fibonacci function
+    tool: execute_python
+    args:
+      code: |
+        def fib(n):
+            a, b = 0, 1
+            for _ in range(n):
+                a, b = b, a + b
+            return a
+        fib(10)
+    expect:
+      contains: "55"
+
+  - name: compute larger values
+    tool: execute_python
+    args:
+      code: "[fib(n) for n in range(10, 16)]"
+    expect:
+      contains: "55"
+
+  - name: find first fibonacci over one million
+    tool: execute_python
+    args:
+      code: |
+        n = 0
+        while fib(n) < 1_000_000:
+            n += 1
+        (n, fib(n))
+    expect:
+      contains: "1346269"

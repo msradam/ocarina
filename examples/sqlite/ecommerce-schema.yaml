@@ -1,0 +1,60 @@
+notes:
+  db: /tmp/ocarina-ecommerce.db
+
+server:
+  command: uvx
+  args: ["mcp-server-sqlite", "--db-path", "{{db}}"]
+
+tracks:
+  - name: create users table
+    tool: write_query
+    args:
+      query: |
+        CREATE TABLE IF NOT EXISTS users (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT UNIQUE NOT NULL
+        )
+
+  - name: create orders table
+    tool: write_query
+    args:
+      query: |
+        CREATE TABLE IF NOT EXISTS orders (
+          id INTEGER PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id),
+          product TEXT NOT NULL,
+          amount REAL NOT NULL,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+
+  - name: seed users
+    tool: write_query
+    args:
+      query: |
+        INSERT OR IGNORE INTO users (name, email) VALUES
+          ('Alice', 'alice@example.com'),
+          ('Bob', 'bob@example.com'),
+          ('Carol', 'carol@example.com')
+
+  - name: seed orders
+    tool: write_query
+    args:
+      query: |
+        INSERT INTO orders (user_id, product, amount) VALUES
+          (1, 'Widget Pro', 49.99),
+          (1, 'Gadget Plus', 129.00),
+          (2, 'Widget Pro', 49.99),
+          (3, 'Deluxe Bundle', 249.95)
+
+  - name: revenue by user
+    tool: read_query
+    args:
+      query: |
+        SELECT u.name, COUNT(o.id) as orders, SUM(o.amount) as total
+        FROM users u
+        JOIN orders o ON o.user_id = u.id
+        GROUP BY u.id
+        ORDER BY total DESC
+    expect:
+      contains: Alice

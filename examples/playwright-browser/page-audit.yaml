@@ -1,0 +1,28 @@
+notes:
+  target_url: https://example.com
+
+server:
+  command: npx
+  args: ["-y", "@playwright/mcp"]
+
+tracks:
+  - name: navigate to page
+    tool: browser_navigate
+    args:
+      url: "{{target_url}}"
+
+  - name: capture accessibility tree
+    tool: browser_snapshot
+    args: {}
+    expect:
+      contains: Example
+
+  - name: take screenshot
+    tool: browser_take_screenshot
+    args: {}
+
+  - name: get page title via snapshot
+    tool: browser_snapshot
+    args: {}
+    expect:
+      contains: Domain

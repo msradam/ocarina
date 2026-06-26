@@ -1,0 +1,25 @@
+notes:
+  pdf_path: /tmp/sample.pdf
+
+server:
+  command: uvx
+  args: ["pdf-mcp"]
+
+tracks:
+  - name: document metadata
+    tool: pdf_info
+    args:
+      pdf_path: "{{pdf_path}}"
+
+  - name: read first two pages
+    tool: pdf_read_pages
+    args:
+      pdf_path: "{{pdf_path}}"
+      start_page: 1
+      end_page: 2
+
+  - name: search for keyword
+    tool: pdf_search
+    args:
+      pdf_path: "{{pdf_path}}"
+      query: introduction

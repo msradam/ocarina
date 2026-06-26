@@ -1,0 +1,41 @@
+notes:
+  github_token: YOUR_GITHUB_PERSONAL_ACCESS_TOKEN
+  owner: msradam
+  repo: ocarina
+
+server:
+  command: npx
+  args: ["-y", "@modelcontextprotocol/server-github"]
+  env:
+    GITHUB_PERSONAL_ACCESS_TOKEN: "{{github_token}}"
+
+tracks:
+  - name: repository overview
+    tool: get_repository
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+    expect:
+      contains: "{{repo}}"
+
+  - name: open issues
+    tool: list_issues
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+      state: open
+
+  - name: recent commits
+    tool: list_commits
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+    expect:
+      contains: "{{owner}}"
+
+  - name: open pull requests
+    tool: list_pull_requests
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+      state: open

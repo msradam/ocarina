@@ -1,0 +1,38 @@
+notes:
+  source_time: "2024-03-15 14:00"
+  source_tz: America/New_York
+
+server:
+  command: uvx
+  args: ["mcp-server-time", "--local-timezone", "{{source_tz}}"]
+
+tracks:
+  - name: current time in New York
+    tool: get_current_time
+    args:
+      timezone: America/New_York
+    expect:
+      contains: America/New_York
+
+  - name: same time in London
+    tool: convert_time
+    args:
+      source_time: "{{source_time}}"
+      source_timezone: "{{source_tz}}"
+      target_timezone: Europe/London
+
+  - name: same time in Tokyo
+    tool: convert_time
+    args:
+      source_time: "{{source_time}}"
+      source_timezone: "{{source_tz}}"
+      target_timezone: Asia/Tokyo
+
+  - name: same time in San Francisco
+    tool: convert_time
+    args:
+      source_time: "{{source_time}}"
+      source_timezone: "{{source_tz}}"
+      target_timezone: America/Los_Angeles
+    expect:
+      contains: America/Los_Angeles

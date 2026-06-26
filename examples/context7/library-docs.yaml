@@ -1,0 +1,22 @@
+notes:
+  library: react
+
+server:
+  command: npx
+  args: ["-y", "@upstash/context7-mcp"]
+
+tracks:
+  - name: resolve library ID
+    tool: resolve-library-id
+    args:
+      libraryName: "{{library}}"
+    echo: library_id
+    expect:
+      contains: react
+
+  - name: fetch library docs
+    tool: get-library-docs
+    args:
+      context7CompatibleLibraryID: "{{library_id}}"
+    expect:
+      contains: react

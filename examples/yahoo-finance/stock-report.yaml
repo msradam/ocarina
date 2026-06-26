@@ -1,0 +1,26 @@
+notes:
+  ticker: AAPL
+
+server:
+  command: uvx
+  args: ["mcp-yahoo-finance"]
+
+tracks:
+  - name: current price
+    tool: get_current_stock_price
+    args:
+      symbol: "{{ticker}}"
+    expect:
+      contains: "{{ticker}}"
+
+  - name: dividend history
+    tool: get_stock_dividends
+    args:
+      symbol: "{{ticker}}"
+
+  - name: recent news
+    tool: get_stock_news
+    args:
+      symbol: "{{ticker}}"
+    expect:
+      contains: Apple

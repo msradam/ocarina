@@ -1,0 +1,27 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["mcp-hn"]
+
+tracks:
+  - name: top 5 stories
+    tool: get_stories
+    args:
+      story_type: top
+      num_stories: 5
+    echo: top_stories_json
+
+  - name: best stories right now
+    tool: get_stories
+    args:
+      story_type: best
+      num_stories: 3
+
+  - name: newest submissions
+    tool: get_stories
+    args:
+      story_type: new
+      num_stories: 3
+    expect:
+      contains: "title"

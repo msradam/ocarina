@@ -1,0 +1,41 @@
+notes:
+  source: |
+    # Hello World
+
+    This is a **bold** statement and this is *italic*.
+
+    - item one
+    - item two
+    - item three
+
+server:
+  command: npx
+  args: ["-y", "mcp-pandoc"]
+
+tracks:
+  - name: markdown to HTML
+    tool: convert-contents
+    args:
+      input: "{{source}}"
+      input_format: markdown
+      output_format: html
+    expect:
+      contains: "<strong>"
+
+  - name: markdown to plain text
+    tool: convert-contents
+    args:
+      input: "{{source}}"
+      input_format: markdown
+      output_format: plain
+    expect:
+      contains: Hello World
+
+  - name: markdown to RST
+    tool: convert-contents
+    args:
+      input: "{{source}}"
+      input_format: markdown
+      output_format: rst
+    expect:
+      contains: "Hello World"
