@@ -14,9 +14,9 @@ type Cassette struct {
 }
 
 type Server struct {
-	Command string   `yaml:"command"`
-	Args    []string `yaml:"args,omitempty"`
-	Env     []string `yaml:"env,omitempty"`
+	Command string            `yaml:"command"`
+	Args    []string          `yaml:"args,omitempty"`
+	Env     map[string]string `yaml:"env,omitempty"`
 }
 
 type Track struct {

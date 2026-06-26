@@ -47,7 +47,8 @@ Example:
 
 		ctx := context.Background()
 		serverArgs := interp.Strings(c.Server.Args, notes)
-		sess, err := mcpclient.Connect(ctx, c.Server.Command, serverArgs)
+		serverEnv := interp.StringMap(c.Server.Env, notes)
+		sess, err := mcpclient.Connect(ctx, c.Server.Command, serverArgs, serverEnv)
 		if err != nil {
 			return fmt.Errorf("connect: %w", err)
 		}

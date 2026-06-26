@@ -28,7 +28,7 @@ Example:
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		sess, err := mcpclient.Connect(ctx, args[0], args[1:])
+		sess, err := mcpclient.Connect(ctx, args[0], args[1:], nil)
 		if err != nil {
 			return fmt.Errorf("connect: %w", err)
 		}

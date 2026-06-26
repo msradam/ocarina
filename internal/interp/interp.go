@@ -42,3 +42,15 @@ func Strings(ss []string, vars map[string]string) []string {
 	}
 	return out
 }
+
+// StringMap applies vars to each value of a string map.
+func StringMap(m map[string]string, vars map[string]string) map[string]string {
+	if len(m) == 0 {
+		return m
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = Apply(v, vars).(string)
+	}
+	return out
+}
