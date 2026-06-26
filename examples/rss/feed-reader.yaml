@@ -1,0 +1,21 @@
+notes:
+  feed_url: https://hnrss.org/frontpage
+
+server:
+  command: uvx
+  args: ["mcp-server-rss"]
+
+tracks:
+  - name: fetch HN RSS feed
+    tool: feed
+    args:
+      url: "{{feed_url}}"
+    expect:
+      contains: Hacker News
+
+  - name: fetch Go blog
+    tool: feed
+    args:
+      url: https://go.dev/blog/feed.atom
+    expect:
+      contains: Go
