@@ -1,0 +1,55 @@
+server:
+  command: uvx
+  args: [--from, fastmcp, python3, /Users/amsrahman/ocarina/examples/custom-task-tracker/server.py]
+
+tracks:
+  - name: add task 1 - Buy groceries
+    tool: add_task
+    args:
+      title: Buy groceries
+      description: Milk, eggs, bread
+    echo: task1_id
+    grab: ".id"
+
+  - name: add task 2 - Write tests
+    tool: add_task
+    args:
+      title: Write tests
+      description: Unit tests for the auth module
+    echo: task2_id
+    grab: ".id"
+
+  - name: add task 3 - Deploy app
+    tool: add_task
+    args:
+      title: Deploy app
+      description: Push v1.2.0 to production
+    echo: task3_id
+    grab: ".id"
+
+  - name: list all tasks
+    tool: list_tasks
+    expect:
+      contains: "Buy groceries"
+
+  - name: complete task 1
+    tool: complete_task
+    args:
+      task_id: "{{task1_id}}"
+
+  - name: list completed tasks - verify task 1 is done
+    tool: list_tasks
+    args:
+      status: completed
+    expect:
+      contains: "completed"
+
+  - name: delete task 2
+    tool: delete_task
+    args:
+      task_id: "{{task2_id}}"
+
+  - name: list all remaining tasks
+    tool: list_tasks
+    expect:
+      contains: "Deploy app"

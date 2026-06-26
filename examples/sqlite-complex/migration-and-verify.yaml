@@ -1,0 +1,150 @@
+# Multi-table e-commerce schema: users, products, orders.
+# Scenario: migrate schema, seed realistic data, run join + aggregate queries,
+# verify data integrity with expect assertions, and use echo chaining to
+# snapshot and re-confirm a count across the workflow.
+#
+# Note on grab: mcp-server-sqlite returns Python dict notation
+# ([{'key': 'val'}] with single quotes), which is not valid JSON.
+# grab requires JSON, so echo is used without grab here.
+# The echo chain (tracks 8 -> 12) captures a count snapshot and
+# verifies it is unchanged after all read operations.
+
+notes:
+  db: /tmp/ocarina-test-complex.db
+
+server:
+  command: uvx
+  args: [mcp-server-sqlite, --db-path, "{{db}}"]
+
+tracks:
+  - name: create users table
+    tool: create_table
+    args:
+      query: |
+        CREATE TABLE IF NOT EXISTS users (
+          id      INTEGER PRIMARY KEY AUTOINCREMENT,
+          name    TEXT    NOT NULL,
+          email   TEXT    NOT NULL UNIQUE,
+          city    TEXT    NOT NULL
+        )
+
+  - name: create products table
+    tool: create_table
+    args:
+      query: |
+        CREATE TABLE IF NOT EXISTS products (
+          id       INTEGER PRIMARY KEY AUTOINCREMENT,
+          name     TEXT    NOT NULL,
+          category TEXT    NOT NULL,
+          price    REAL    NOT NULL CHECK(price > 0)
+        )
+
+  - name: create orders table
+    tool: create_table
+    args:
+      query: |
+        CREATE TABLE IF NOT EXISTS orders (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id     INTEGER NOT NULL REFERENCES users(id),
+          product_id  INTEGER NOT NULL REFERENCES products(id),
+          quantity    INTEGER NOT NULL DEFAULT 1 CHECK(quantity > 0),
+          total_price REAL    NOT NULL,
+          ordered_at  TEXT    NOT NULL
+        )
+
+  - name: seed users
+    tool: write_query
+    args:
+      query: |
+        INSERT INTO users (name, email, city) VALUES
+          ('Alice',  'alice@example.com',  'New York'),
+          ('Bob',    'bob@example.com',    'Chicago'),
+          ('Carol',  'carol@example.com',  'Austin'),
+          ('Dave',   'dave@example.com',   'Seattle'),
+          ('Eve',    'eve@example.com',    'Denver')
+
+  - name: seed products
+    tool: write_query
+    args:
+      query: |
+        INSERT INTO products (name, category, price) VALUES
+          ('Laptop',      'Electronics', 999.99),
+          ('Phone',       'Electronics', 599.99),
+          ('Headphones',  'Electronics', 149.99),
+          ('Python Book', 'Books',        39.99),
+          ('Standing Desk','Furniture',  299.99)
+
+  - name: seed orders
+    tool: write_query
+    args:
+      query: |
+        INSERT INTO orders (user_id, product_id, quantity, total_price, ordered_at) VALUES
+          (1, 1, 1,  999.99, '2026-06-01T09:00:00Z'),
+          (1, 2, 1,  599.99, '2026-06-02T10:00:00Z'),
+          (1, 4, 2,   79.98, '2026-06-03T11:00:00Z'),
+          (2, 3, 1,  149.99, '2026-06-04T09:30:00Z'),
+          (2, 4, 1,   39.99, '2026-06-05T14:00:00Z'),
+          (3, 5, 1,  299.99, '2026-06-06T08:00:00Z'),
+          (3, 1, 1,  999.99, '2026-06-07T12:00:00Z'),
+          (4, 2, 2, 1199.98, '2026-06-08T15:00:00Z'),
+          (5, 3, 1,  149.99, '2026-06-09T10:00:00Z'),
+          (5, 4, 3,  119.97, '2026-06-10T16:00:00Z')
+
+  - name: list tables
+    tool: list_tables
+
+  - name: snapshot order count
+    tool: read_query
+    args:
+      query: "SELECT COUNT(*) AS total_orders FROM orders"
+    echo: order_count_snapshot
+
+  - name: revenue by product category
+    tool: read_query
+    args:
+      query: |
+        SELECT p.category,
+               COUNT(o.id)            AS order_lines,
+               SUM(o.total_price)     AS revenue
+        FROM   orders o
+        JOIN   products p ON p.id = o.product_id
+        GROUP  BY p.category
+        ORDER  BY revenue DESC
+    expect:
+      contains: "Electronics"
+
+  - name: full order detail — join across all three tables
+    tool: read_query
+    args:
+      query: |
+        SELECT u.name AS customer,
+               p.name AS product,
+               o.quantity,
+               o.total_price,
+               o.ordered_at
+        FROM   orders o
+        JOIN   users   u ON u.id = o.user_id
+        JOIN   products p ON p.id = o.product_id
+        ORDER  BY o.ordered_at
+
+  - name: top customer by total spend
+    tool: read_query
+    args:
+      query: |
+        SELECT u.name,
+               COUNT(o.id)        AS orders,
+               SUM(o.total_price) AS total_spent
+        FROM   users u
+        JOIN   orders o ON u.id = o.user_id
+        GROUP  BY u.id
+        ORDER  BY total_spent DESC
+        LIMIT  3
+    expect:
+      contains: "Alice"
+
+  - name: verify order count unchanged after reads
+    tool: read_query
+    args:
+      query: "SELECT COUNT(*) AS total_orders FROM orders"
+    expect:
+      contains: "{{order_count_snapshot}}"
