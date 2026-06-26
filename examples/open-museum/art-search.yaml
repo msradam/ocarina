@@ -1,0 +1,28 @@
+notes: {}
+
+server:
+  command: npx
+  args: ["-y", "open-museum-mcp"]
+
+tracks:
+  - name: search impressionist paintings
+    tool: search_artworks
+    args:
+      query: impressionist landscape
+      limit: 3
+    expect:
+      contains: title
+
+  - name: search ancient Egyptian artifacts
+    tool: search_artworks
+    args:
+      query: ancient Egypt sculpture
+      limit: 3
+
+  - name: search Japanese woodblock prints
+    tool: search_artworks
+    args:
+      query: Japanese woodblock Hokusai
+      limit: 3
+    expect:
+      contains: title

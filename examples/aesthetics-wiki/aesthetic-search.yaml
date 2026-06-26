@@ -1,0 +1,28 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["aesthetics-wiki-mcp"]
+
+tracks:
+  - name: search dark academia
+    tool: search_aesthetic
+    args:
+      query: dark academia
+      limit: 3
+    expect:
+      contains: dark
+
+  - name: search cottagecore
+    tool: search_aesthetic
+    args:
+      query: cottagecore
+      limit: 3
+
+  - name: search vaporwave
+    tool: search_aesthetic
+    args:
+      query: vaporwave
+      limit: 3
+    expect:
+      contains: aesthetic

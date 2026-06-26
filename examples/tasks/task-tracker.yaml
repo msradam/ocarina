@@ -1,0 +1,31 @@
+notes:
+  file: /tmp/my-tasks.md
+
+server:
+  command: npx
+  args: ["-y", "mcp-tasks"]
+
+tracks:
+  - name: initialize tasks file
+    tool: tasks_setup
+    args:
+      path: "{{file}}"
+
+  - name: add first task
+    tool: tasks_add
+    args:
+      path: "{{file}}"
+      task: Write unit tests for the new feature
+
+  - name: add second task
+    tool: tasks_add
+    args:
+      path: "{{file}}"
+      task: Update documentation
+
+  - name: list all tasks
+    tool: tasks_list
+    args:
+      path: "{{file}}"
+    expect:
+      contains: unit tests

@@ -1,0 +1,18 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["plant-genomics-mcp"]
+
+tracks:
+  - name: lookup Arabidopsis locus AT1G01010
+    tool: ensembl_plants_lookup_locus
+    args:
+      locus: AT1G01010
+    expect:
+      contains: arabidopsis
+
+  - name: lookup another locus
+    tool: ensembl_plants_lookup_locus
+    args:
+      locus: AT2G01008
