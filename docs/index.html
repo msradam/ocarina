@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="en" data-theme="ink">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ocarina</title>
+  <meta name="description" content="Record an LLM's MCP tool calls to a YAML cassette. Replay them against the real server without an LLM.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/msradam/lokta-css@main/lokta.tokens.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/msradam/lokta-css@main/lokta.css">
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/core.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/bash.min.js"></script>
+
+  <style>
+    /* ── layout ──────────────────────────────────────────────────────────── */
+    body { margin: 0; }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      border-right: var(--rule-1) solid var(--border-default);
+      background: var(--surface-sunken);
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-5) 0 var(--space-6);
+      scrollbar-width: thin;
+    }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: 0 var(--space-4) var(--space-4);
+      border-bottom: var(--rule-1) solid var(--border-hairline);
+      margin-bottom: var(--space-4);
+      text-decoration: none;
+    }
+
+    .sidebar-brand-icon {
+      width: 28px;
+      height: 28px;
+      flex: none;
+    }
+
+    .nav-section-label {
+      font-family: "Spline Sans Mono", ui-monospace, monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: var(--space-4) var(--space-4) var(--space-1);
+    }
+
+    .nav-sub-item {
+      padding-left: calc(var(--space-4) + var(--space-3) + 2px);
+      font-size: 11px;
+      color: var(--text-secondary);
+      border-left-color: transparent !important;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: var(--space-4);
+      border-top: var(--rule-1) solid var(--border-hairline);
+    }
+
+    /* ── main ────────────────────────────────────────────────────────────── */
+    .docs-main {
+      min-height: 100vh;
+      background: var(--surface-page);
+    }
+
+    .docs-section {
+      padding: var(--space-8) var(--space-6);
+      max-width: 860px;
+    }
+
+    .docs-section + .docs-section {
+      border-top: var(--rule-1) solid var(--border-hairline);
+    }
+
+    /* ── hero ────────────────────────────────────────────────────────────── */
+    .hero-band {
+      background: var(--surface-sunken);
+      border-bottom: var(--rule-2) solid var(--border-strong);
+      border-left: 4px solid var(--viz-1);
+      padding: var(--space-8) var(--space-6);
+      position: relative;
+    }
+
+    .hero-band::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 24px,
+        var(--border-hairline) 24px,
+        var(--border-hairline) 25px
+      );
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .hero-band > div { position: relative; }
+
+    .hero-icon {
+      width: 64px;
+      height: 64px;
+      margin-bottom: var(--space-4);
+      color: var(--viz-1);
+    }
+
+    /* ── code blocks ─────────────────────────────────────────────────────── */
+    .code-wrap {
+      background: var(--surface-sunken);
+      border: var(--rule-1) solid var(--border-default);
+      border-left: 3px solid var(--viz-1);
+      margin: var(--space-4) 0;
+      overflow-x: auto;
+    }
+
+    .code-label {
+      font-family: "Spline Sans Mono", ui-monospace, monospace;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--viz-1);
+      padding: var(--space-2) var(--space-3);
+      border-bottom: var(--rule-1) solid var(--border-hairline);
+      background: var(--surface-inset);
+    }
+
+    .code-wrap pre {
+      margin: 0;
+      padding: var(--space-4);
+      font-family: "Spline Sans Mono", ui-monospace, monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: var(--text-body);
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    /* hljs tokens via Lokta semantic vars — adapts with theme */
+    .hljs { background: transparent !important; padding: 0 !important; color: var(--text-body) !important; }
+    .hljs-attr { color: var(--viz-1) !important; }
+    .hljs-string { color: var(--pigment-malachite, #3F6B4E) !important; }
+    [data-theme="ink"] .hljs-string { color: var(--pigment-malachite-light, #7FB08C) !important; }
+    .hljs-number, .hljs-literal { color: var(--pigment-madder, #8E3B30) !important; }
+    [data-theme="ink"] .hljs-number, [data-theme="ink"] .hljs-literal { color: var(--pigment-madder-light, #DE9684) !important; }
+    .hljs-comment { color: var(--text-muted) !important; font-style: italic; }
+    .hljs-keyword, .hljs-built_in { color: var(--viz-4) !important; }
+    .hljs-variable { color: var(--pigment-turmeric, #7A5A12) !important; }
+    [data-theme="ink"] .hljs-variable { color: var(--pigment-turmeric-light, #E0B452) !important; }
+    .hljs-meta { color: var(--text-secondary) !important; }
+
+    /* ── theme toggle ────────────────────────────────────────────────────── */
+    .theme-btn {
+      font-family: "Spline Sans Mono", ui-monospace, monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: var(--space-2) var(--space-3);
+      border: var(--rule-1) solid var(--border-default);
+      background: var(--surface-raised);
+      color: var(--text-secondary);
+      cursor: pointer;
+      width: 100%;
+    }
+    .theme-btn:hover { background: var(--surface-inset); color: var(--text-primary); }
+
+    /* ── field annotations (for cassette format table) ───────────────────── */
+    .field-table { width: 100%; border-collapse: collapse; margin: var(--space-3) 0; }
+    .field-table th {
+      font-family: "Spline Sans Mono", ui-monospace, monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-align: left;
+      padding: var(--space-2) var(--space-3);
+      border-bottom: var(--rule-2) solid var(--border-strong);
+    }
+    .field-table td {
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--type-sm);
+      color: var(--text-body);
+      border-bottom: var(--rule-1) solid var(--border-hairline);
+      vertical-align: top;
+    }
+    .field-table tr:last-child td { border-bottom: none; }
+
+    /* ── examples table ──────────────────────────────────────────────────── */
+    .ex-table { width: 100%; border-collapse: collapse; margin: var(--space-3) 0; font-size: var(--type-sm); }
+    .ex-table th {
+      font-family: "Spline Sans Mono", ui-monospace, monospace;
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+      font-weight: 600; color: var(--text-muted); text-align: left;
+      padding: var(--space-2) var(--space-3);
+      border-bottom: var(--rule-2) solid var(--border-strong);
+    }
+    .ex-table td { padding: var(--space-2) var(--space-3); border-bottom: var(--rule-1) solid var(--border-hairline); color: var(--text-body); }
+    .ex-table tr:nth-child(even) td { background: var(--surface-sunken); }
+
+    /* ── command blocks ──────────────────────────────────────────────────── */
+    .cmd-block {
+      border-left: var(--rule-2) solid var(--border-strong);
+      margin: var(--space-6) 0;
+      padding-left: var(--space-4);
+    }
+
+    /* ── demo gif ────────────────────────────────────────────────────────── */
+    .demo-gif {
+      width: 100%;
+      max-width: 740px;
+      border: var(--rule-1) solid var(--border-default);
+      display: block;
+      margin: var(--space-4) 0;
+    }
+
+    /* ── mobile ──────────────────────────────────────────────────────────── */
+    @media (max-width: 720px) {
+      .lk-shell { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .docs-section { padding: var(--space-6) var(--space-4); }
+      .hero-band { padding: var(--space-6) var(--space-4); }
+    }
+  </style>
+</head>
+
+<body class="lk">
+<a class="lk-sr-only" href="#main">Skip to content</a>
+
+<div class="lk-shell">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+  <aside class="sidebar" aria-label="Documentation navigation">
+
+    <a class="sidebar-brand" href="#top">
+      <svg class="sidebar-brand-icon" viewBox="0 0 200 200" aria-hidden="true">
+        <!-- whistle icon — Alessio Capponi / Noun Project CC BY 3.0 -->
+        <polygon points="135.5 47 144.25 47 153 47 153 38 144.25 38 135.5 38 126.75 38 118 38 118 47 126.75 47 135.5 47" fill="currentColor"/>
+        <polygon points="108.33 56 117 56 117 47 108.33 47 99.67 47 91 47 91 56 99.67 56 108.33 56" fill="currentColor"/>
+        <polygon points="82 74 91 74 91 65 91 56 82 56 73 56 73 65 82 65 82 74" fill="currentColor"/>
+        <polygon points="64.67 153 56 153 56 162 64.67 162 73.33 162 82 162 82 153 73.33 153 64.67 153" fill="currentColor"/>
+        <polygon points="91 144 82 144 82 153 91 153 100 153 100 144 91 144" fill="currentColor"/>
+        <polygon points="100 153 100 162 109 162 118 162 118 153 109 153 100 153" fill="currentColor"/>
+        <rect x="65" y="65" width="9" height="9" fill="currentColor"/>
+        <rect x="56" y="73" width="9" height="9" fill="currentColor"/>
+        <rect x="65" y="82" width="9" height="9" fill="currentColor"/>
+        <polygon points="56 91 56 82 47 82 47 91 47 100 56 100 56 91" fill="currentColor"/>
+        <polygon points="47 126.4 47 117.6 47 108.8 47 100 38 100 38 108.8 38 117.6 38 126.4 38 135.2 38 144 47 144 47 135.2 47 126.4" fill="currentColor"/>
+        <rect x="47" y="144" width="9" height="9" fill="currentColor"/>
+        <polygon points="153 47 153 55.67 153 64.33 153 73 162 73 162 64.33 162 55.67 162 47 153 47" fill="currentColor"/>
+        <polygon points="144 82 144 91 153 91 153 82 153 73 144 73 144 82" fill="currentColor"/>
+        <rect x="135" y="56" width="9" height="9" fill="currentColor"/>
+        <rect x="118" y="65" width="9" height="9" fill="currentColor"/>
+        <rect x="100" y="82" width="9" height="9" fill="currentColor"/>
+        <polygon points="135 100 135 109 144 109 144 100 144 91 135 91 135 100" fill="currentColor"/>
+        <polygon points="118 135 109 135 109 144 118 144 118 153 127 153 127 144 135 144 135 135 135 126 127 126 127 135 118 135" fill="currentColor"/>
+        <polygon points="109 109 100 109 100 118 109 118 118 118 118 109 109 109" fill="currentColor"/>
+        <rect x="91" y="118" width="9" height="9" fill="currentColor"/>
+        <rect x="56" y="109" width="9" height="9" fill="currentColor"/>
+        <rect x="118" y="118" width="9" height="9" fill="currentColor"/>
+        <rect x="126" y="109" width="9" height="9" fill="currentColor"/>
+      </svg>
+      <span class="lk-sidebar-brand">Ocarina</span>
+    </a>
+
+    <nav aria-label="Docs sections">
+      <div class="nav-section-label">Docs</div>
+      <a class="lk-nav-item" href="#why">Why</a>
+      <a class="lk-nav-item" href="#install">Install</a>
+      <a class="lk-nav-item" href="#cassette">Cassette format</a>
+      <a class="lk-nav-item" href="#commands">Commands</a>
+      <a class="lk-nav-item nav-sub-item" href="#record">record</a>
+      <a class="lk-nav-item nav-sub-item" href="#play">play</a>
+      <a class="lk-nav-item nav-sub-item" href="#compose">compose</a>
+      <a class="lk-nav-item" href="#examples">Examples</a>
+      <a class="lk-nav-item" href="#ci">Use in CI</a>
+      <a class="lk-nav-item" href="#scope">Scope</a>
+
+      <div class="nav-section-label" style="margin-top:var(--space-4)">Links</div>
+      <a class="lk-nav-item" href="https://github.com/msradam/ocarina" target="_blank" rel="noopener">GitHub</a>
+      <a class="lk-nav-item" href="https://github.com/msradam/ocarina/releases" target="_blank" rel="noopener">Releases</a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="theme-btn" onclick="toggleTheme()" aria-label="Toggle light/dark theme" id="theme-btn">
+        ◐ Paper / Ink
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main ────────────────────────────────────────────────────────────── -->
+  <main class="lk-main docs-main" id="main">
+
+    <!-- Hero -->
+    <div class="hero-band" id="top">
+      <div style="max-width:860px;padding:0">
+
+        <div class="lk-running-head" style="margin-bottom:var(--space-5)">
+          <span class="lk-eyebrow">Ocarina</span>
+          <span class="lk-eyebrow">v0.1</span>
+        </div>
+
+        <svg class="hero-icon" viewBox="0 0 200 200" aria-hidden="true">
+          <polygon points="135.5 47 144.25 47 153 47 153 38 144.25 38 135.5 38 126.75 38 118 38 118 47 126.75 47 135.5 47" fill="currentColor"/>
+          <polygon points="108.33 56 117 56 117 47 108.33 47 99.67 47 91 47 91 56 99.67 56 108.33 56" fill="currentColor"/>
+          <polygon points="82 74 91 74 91 65 91 56 82 56 73 56 73 65 82 65 82 74" fill="currentColor"/>
+          <polygon points="64.67 153 56 153 56 162 64.67 162 73.33 162 82 162 82 153 73.33 153 64.67 153" fill="currentColor"/>
+          <polygon points="91 144 82 144 82 153 91 153 100 153 100 144 91 144" fill="currentColor"/>
+          <polygon points="100 153 100 162 109 162 118 162 118 153 109 153 100 153" fill="currentColor"/>
+          <rect x="65" y="65" width="9" height="9" fill="currentColor"/>
+          <rect x="56" y="73" width="9" height="9" fill="currentColor"/>
+          <rect x="65" y="82" width="9" height="9" fill="currentColor"/>
+          <polygon points="56 91 56 82 47 82 47 91 47 100 56 100 56 91" fill="currentColor"/>
+          <polygon points="47 126.4 47 117.6 47 108.8 47 100 38 100 38 108.8 38 117.6 38 126.4 38 135.2 38 144 47 144 47 135.2 47 126.4" fill="currentColor"/>
+          <rect x="47" y="144" width="9" height="9" fill="currentColor"/>
+          <polygon points="153 47 153 55.67 153 64.33 153 73 162 73 162 64.33 162 55.67 162 47 153 47" fill="currentColor"/>
+          <polygon points="144 82 144 91 153 91 153 82 153 73 144 73 144 82" fill="currentColor"/>
+          <rect x="135" y="56" width="9" height="9" fill="currentColor"/>
+          <rect x="118" y="65" width="9" height="9" fill="currentColor"/>
+          <rect x="100" y="82" width="9" height="9" fill="currentColor"/>
+          <polygon points="135 100 135 109 144 109 144 100 144 91 135 91 135 100" fill="currentColor"/>
+          <polygon points="118 135 109 135 109 144 118 144 118 153 127 153 127 144 135 144 135 135 135 126 127 126 127 135 118 135" fill="currentColor"/>
+          <polygon points="109 109 100 109 100 118 109 118 118 118 118 109 109 109" fill="currentColor"/>
+          <rect x="91" y="118" width="9" height="9" fill="currentColor"/>
+          <rect x="56" y="109" width="9" height="9" fill="currentColor"/>
+          <rect x="118" y="118" width="9" height="9" fill="currentColor"/>
+          <rect x="126" y="109" width="9" height="9" fill="currentColor"/>
+        </svg>
+
+        <h1 class="lk-display" style="margin:0 0 var(--space-3)">Ocarina</h1>
+        <p class="lk-lede" style="max-width:52ch;margin:0 0 var(--space-5)">When an LLM uses MCP tools, the tool calls are deterministic. The LLM is not. Ocarina records those calls to a YAML file and replays them against the real server, without the LLM.</p>
+
+        <div class="lk-cluster" style="margin-bottom:var(--space-5)">
+          <a class="lk-btn lk-btn-primary" href="#install">Get started</a>
+          <a class="lk-btn" href="https://github.com/msradam/ocarina" target="_blank" rel="noopener">GitHub</a>
+        </div>
+
+        <div class="code-wrap" style="max-width:480px">
+          <div class="code-label">terminal</div>
+          <pre><code class="language-bash">ocarina record session.yaml uvx mcp-server-fetch
+ocarina play   session.yaml
+ocarina compose uvx mcp-server-fetch</code></pre>
+        </div>
+
+        <div class="lk-measure" style="margin-top:var(--space-6)">
+          <span class="lk-measure-line" style="width:80px"></span>
+          <span class="lk-measure-gap"></span>
+          <span class="lk-measure-hatch"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demo -->
+    <div class="docs-section" id="demo" style="padding-bottom:0">
+      <img src="../assets/demo.gif" alt="Ocarina demo: compose showing [readonly][idempotent] tool annotations, play running a timezone workflow, play with PASS assertions" class="demo-gif">
+    </div>
+
+    <!-- Why -->
+    <section class="docs-section" id="why">
+      <div class="lk-running-head"><span class="lk-eyebrow">01</span><span class="lk-eyebrow">Why</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">The reproducible part of an agentic system</h2>
+
+      <p class="lk-lede" style="max-width:60ch">MCP tool calls return the same output for the same inputs, regardless of which LLM issued them. Once you record a session, you can replay it in CI, check that the server still returns what you expect, and catch regressions without an API key.</p>
+
+      <div class="lk-measure" style="margin:var(--space-5) 0"><span class="lk-measure-line" style="width:60px"></span><span class="lk-measure-gap"></span><span class="lk-measure-hatch"></span></div>
+
+      <div class="lk-grid lk-cols-3" style="margin-top:var(--space-4)">
+        <article class="lk-feature">
+          <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Record</p>
+          <h3 class="lk-feature-title">Capture any session</h3>
+          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Run ocarina as a transparent stdio proxy. Every <code class="lk-code-inline">tools/call</code> request and response goes into a YAML cassette, including <code class="lk-code-inline">sampling/createMessage</code> LLM callbacks from agentic servers.</p>
+        </article>
+        <article class="lk-feature">
+          <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Play</p>
+          <h3 class="lk-feature-title">Replay without an LLM</h3>
+          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Execute every track in order. Chain outputs with <code class="lk-code-inline">echo:</code> and <code class="lk-code-inline">grab:</code>. Assert on results with <code class="lk-code-inline">expect:</code>. Exits non-zero if an assertion fails, so it works as a CI step.</p>
+        </article>
+        <article class="lk-feature">
+          <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Compose</p>
+          <h3 class="lk-feature-title">Introspect any server</h3>
+          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">List tools with their schemas and side-effect hints (<code class="lk-code-inline">[readonly]</code>, <code class="lk-code-inline">[destructive]</code>, <code class="lk-code-inline">[idempotent]</code>). Emit a skeleton cassette with <code class="lk-code-inline">--yaml</code>.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Install -->
+    <section class="docs-section" id="install">
+      <div class="lk-running-head"><span class="lk-eyebrow">02</span><span class="lk-eyebrow">Install</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Install</h2>
+
+      <p style="color:var(--text-body);margin-bottom:var(--space-4)">Requires Go 1.26.4+.</p>
+
+      <div class="code-wrap" style="max-width:500px">
+        <div class="code-label">go install</div>
+        <pre><code class="language-bash">go install github.com/msradam/ocarina@latest</code></pre>
+      </div>
+
+      <p style="color:var(--text-body);margin:var(--space-4) 0">Or download a binary from <a class="lk-link" href="https://github.com/msradam/ocarina/releases" target="_blank" rel="noopener">releases</a>.</p>
+
+      <h3 class="lk-h3" style="margin:var(--space-6) 0 var(--space-3)">Quick start</h3>
+
+      <p style="color:var(--text-body);margin-bottom:var(--space-3)">Discover what tools a server exposes:</p>
+      <div class="code-wrap">
+        <div class="code-label">terminal</div>
+        <pre><code class="language-bash">ocarina compose uvx mcp-server-time
+# Server: uvx [mcp-server-time]
+# 2 tool(s) available:
+#
+#   tool: [readonly] [idempotent] get_current_time
+#     description: Get current time in a specific timezone
+#   tool: [readonly] [idempotent] convert_time
+#     description: Convert time between timezones</code></pre>
+      </div>
+
+      <p style="color:var(--text-body);margin:var(--space-4) 0 var(--space-3)">Configure your MCP host to run Ocarina instead of the server directly, then use it normally:</p>
+      <div class="code-wrap">
+        <div class="code-label">terminal</div>
+        <pre><code class="language-bash">ocarina record session.yaml uvx mcp-server-fetch
+# ... use your MCP host normally ...
+# ocarina: recorded 3 track(s) to session.yaml</code></pre>
+      </div>
+
+      <p style="color:var(--text-body);margin:var(--space-4) 0 var(--space-3)">Play it back without an LLM:</p>
+      <div class="code-wrap">
+        <div class="code-label">terminal</div>
+        <pre><code class="language-bash">ocarina play session.yaml
+# ==> fetch (fetch)
+# &lt;html&gt;...</code></pre>
+      </div>
+    </section>
+
+    <!-- Cassette format -->
+    <section class="docs-section" id="cassette">
+      <div class="lk-running-head"><span class="lk-eyebrow">03</span><span class="lk-eyebrow">Cassette format</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Cassette format</h2>
+
+      <p style="color:var(--text-body);margin-bottom:var(--space-4)">A cassette is a YAML file. Write one by hand or record it from a live session. Commit it to git.</p>
+
+      <div class="code-wrap">
+        <div class="code-label">examples/github-investigation.yaml</div>
+        <pre><code class="language-yaml"># Investigate any GitHub repo. Swap notes.owner and notes.repo to change repos.
+notes:
+  owner: modelcontextprotocol
+  repo: go-sdk
+
+server:
+  command: npx
+  args: [-y, "@modelcontextprotocol/server-github"]
+
+tracks:
+  - name: list recent commits
+    tool: list_commits
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+      per_page: 5
+    echo: commits_json      # capture output into notes
+    grab: ".0.sha"          # extract first SHA from JSON array
+
+  - name: show latest commit
+    tool: get_commit
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+      sha: "{{commits_json}}"  # value from previous track
+
+  - name: list open issues
+    tool: list_issues
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+      state: open</code></pre>
+      </div>
+
+      <h3 class="lk-h3" style="margin:var(--space-6) 0 var(--space-3)">Track fields</h3>
+      <table class="field-table">
+        <thead>
+          <tr><th>Field</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code class="lk-code-inline">tool</code></td><td>Tool name to call.</td></tr>
+          <tr><td><code class="lk-code-inline">args</code></td><td>Arguments. <code class="lk-code-inline">{{key}}</code> interpolates from <code class="lk-code-inline">notes</code>.</td></tr>
+          <tr><td><code class="lk-code-inline">echo</code></td><td>Capture text output into <code class="lk-code-inline">notes</code> under this key for use in later tracks.</td></tr>
+          <tr><td><code class="lk-code-inline">grab</code></td><td>Dot-path into JSON output (<code class="lk-code-inline">.0.sha</code>, <code class="lk-code-inline">.name</code>), applied before <code class="lk-code-inline">echo</code> captures.</td></tr>
+          <tr><td><code class="lk-code-inline">expect.contains</code></td><td>Assert output contains this string. <code class="lk-code-inline">play</code> exits non-zero if not. Interpolates <code class="lk-code-inline">{{notes}}</code>.</td></tr>
+          <tr><td><code class="lk-code-inline">result</code></td><td>Recorded output, kept for reference. Not used during replay.</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="lk-h3" style="margin:var(--space-6) 0 var(--space-3)">Cassette-level fields</h3>
+      <table class="field-table">
+        <thead>
+          <tr><th>Field</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code class="lk-code-inline">notes</code></td><td>Static variables, interpolated as <code class="lk-code-inline">{{key}}</code> throughout all tracks.</td></tr>
+          <tr><td><code class="lk-code-inline">server</code></td><td>Command and args to launch the MCP server.</td></tr>
+          <tr><td><code class="lk-code-inline">llm</code></td><td>Captured <code class="lk-code-inline">sampling/createMessage</code> exchanges. Populated by <code class="lk-code-inline">record</code> when an agentic server calls back to the LLM.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Commands -->
+    <section class="docs-section" id="commands">
+      <div class="lk-running-head"><span class="lk-eyebrow">04</span><span class="lk-eyebrow">Commands</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0">Commands</h2>
+
+      <!-- record -->
+      <div class="cmd-block" id="record">
+        <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">record</p>
+        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina record &lt;output.yaml&gt; &lt;command&gt; [args...]</h3>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">A stdio proxy between your MCP host and server. Records every <code class="lk-code-inline">tools/call</code> request and response. Also captures <code class="lk-code-inline">sampling/createMessage</code> exchanges when an agentic server calls back to the LLM, stored in the cassette's <code class="lk-code-inline">llm:</code> block.</p>
+        <div class="code-wrap">
+          <div class="code-label">terminal</div>
+          <pre><code class="language-bash">ocarina record out.yaml uvx mcp-server-sqlite --db-path /tmp/db.sqlite
+ocarina record out.yaml npx -y @modelcontextprotocol/server-github</code></pre>
+        </div>
+        <p style="color:var(--text-body);margin:var(--space-3) 0 var(--space-2);font-size:var(--type-sm)"><strong>Flags</strong></p>
+        <table class="field-table" style="max-width:480px">
+          <tbody>
+            <tr><td><code class="lk-code-inline">--no-result</code></td><td>Omit result blocks from the cassette (smaller files, cleaner diffs).</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- play -->
+      <div class="cmd-block" id="play" style="margin-top:var(--space-6)">
+        <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">play</p>
+        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina play &lt;cassette.yaml&gt;</h3>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Executes each track in order against the live server. No LLM needed. Notes from <code class="lk-code-inline">echo:</code> feed into subsequent tracks via <code class="lk-code-inline">{{key}}</code> interpolation. Exits non-zero if any <code class="lk-code-inline">expect:</code> assertion fails.</p>
+        <div class="code-wrap">
+          <div class="code-label">terminal</div>
+          <pre><code class="language-bash">ocarina play examples/github-investigation.yaml
+ocarina play examples/mcp-smoke-test.yaml   # has assertions
+ocarina play examples/github-investigation.yaml --dry-run</code></pre>
+        </div>
+        <p style="color:var(--text-body);margin:var(--space-3) 0 var(--space-2);font-size:var(--type-sm)"><strong>Flags</strong></p>
+        <table class="field-table" style="max-width:480px">
+          <tbody>
+            <tr><td><code class="lk-code-inline">--dry-run</code></td><td>Print tracks without executing them.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- compose -->
+      <div class="cmd-block" id="compose" style="margin-top:var(--space-6)">
+        <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">compose</p>
+        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina compose &lt;command&gt; [args...]</h3>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Connects to a server and lists tools with their schemas. Servers that declare side-effect hints show badges: <code class="lk-code-inline">[readonly]</code>, <code class="lk-code-inline">[destructive]</code>, <code class="lk-code-inline">[idempotent]</code>. Use <code class="lk-code-inline">--yaml</code> to emit a skeleton cassette instead.</p>
+        <div class="code-wrap">
+          <div class="code-label">terminal</div>
+          <pre><code class="language-bash">ocarina compose uvx mcp-server-fetch
+ocarina compose uvx mcp-server-sqlite --db-path /tmp/db.sqlite
+ocarina compose npx -y @modelcontextprotocol/server-filesystem /tmp
+ocarina compose --yaml uvx mcp-server-fetch   # emit skeleton cassette</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Examples -->
+    <section class="docs-section" id="examples">
+      <div class="lk-running-head"><span class="lk-eyebrow">05</span><span class="lk-eyebrow">Examples</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Examples</h2>
+      <p style="color:var(--text-body);margin-bottom:var(--space-4)">Working cassettes in <code class="lk-code-inline">examples/</code>, each verified against a live server.</p>
+
+      <table class="ex-table">
+        <thead>
+          <tr><th>File</th><th>Server</th><th>What it shows</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/fetch-demo.yaml" target="_blank">fetch-demo.yaml</a></td>
+            <td><code class="lk-code-inline">uvx mcp-server-fetch</code></td>
+            <td>Basic fetch and content capture</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/github-investigation.yaml" target="_blank">github-investigation.yaml</a></td>
+            <td><code class="lk-code-inline">server-github</code></td>
+            <td><code class="lk-code-inline">echo:</code> + <code class="lk-code-inline">grab:</code> to chain API calls, extract SHA from JSON array</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/sqlite-migration.yaml" target="_blank">sqlite-migration.yaml</a></td>
+            <td><code class="lk-code-inline">uvx mcp-server-sqlite</code></td>
+            <td>Stateful workflow: create table, seed rows, query results</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/git-repo-audit.yaml" target="_blank">git-repo-audit.yaml</a></td>
+            <td><code class="lk-code-inline">uvx mcp-server-git</code></td>
+            <td>Local repo audit: log, status, diff, branches</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/mcp-smoke-test.yaml" target="_blank">mcp-smoke-test.yaml</a></td>
+            <td><code class="lk-code-inline">server-everything</code></td>
+            <td><code class="lk-code-inline">expect:</code> assertions; use as a CI smoke test</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/sequential-thinking-demo.yaml" target="_blank">sequential-thinking-demo.yaml</a></td>
+            <td><code class="lk-code-inline">server-sequential-thinking</code></td>
+            <td>Multi-step reasoning chain captured as a cassette</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/knowledge-graph-demo.yaml" target="_blank">knowledge-graph-demo.yaml</a></td>
+            <td><code class="lk-code-inline">server-memory</code></td>
+            <td>Create, relate, search, and delete lifecycle with assertions</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/puppeteer-scrape.yaml" target="_blank">puppeteer-scrape.yaml</a></td>
+            <td><code class="lk-code-inline">server-puppeteer</code></td>
+            <td>Headless browser: navigate, evaluate JS, screenshot</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/time-zones.yaml" target="_blank">time-zones.yaml</a></td>
+            <td><code class="lk-code-inline">uvx mcp-server-time</code></td>
+            <td>Parameterized timezone conversions, <code class="lk-code-inline">[readonly]</code> annotations</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- CI -->
+    <section class="docs-section" id="ci">
+      <div class="lk-running-head"><span class="lk-eyebrow">06</span><span class="lk-eyebrow">Use in CI</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Use in CI</h2>
+
+      <p style="color:var(--text-body);margin-bottom:var(--space-4)"><code class="lk-code-inline">play</code> exits 0 if all expectations pass, non-zero otherwise. No API keys needed.</p>
+
+      <div class="code-wrap">
+        <div class="code-label">.github/workflows/mcp-test.yml</div>
+        <pre><code class="language-yaml">name: MCP smoke tests
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+      - run: go install github.com/msradam/ocarina@latest
+      - run: ocarina play examples/mcp-smoke-test.yaml</code></pre>
+      </div>
+    </section>
+
+    <!-- Scope -->
+    <section class="docs-section" id="scope">
+      <div class="lk-running-head"><span class="lk-eyebrow">07</span><span class="lk-eyebrow">Scope</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">What Ocarina is not</h2>
+
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">Ocarina does not score LLM outputs, compare models, or track token costs. It connects to the real MCP server on every <code class="lk-code-inline">play</code> run, so a broken server breaks the replay. It has no test runner, no discovery, and no report format beyond stdout and exit codes.</p>
+
+      <div class="lk-measure" style="margin:var(--space-6) 0"><span class="lk-measure-line" style="width:60px"></span><span class="lk-measure-gap"></span><span class="lk-measure-hatch"></span></div>
+
+      <p style="color:var(--text-muted);font-size:var(--type-sm)">
+        <a class="lk-link" href="https://github.com/msradam/ocarina" target="_blank" rel="noopener">GitHub</a>
+        &nbsp;·&nbsp;
+        <a class="lk-link" href="https://github.com/msradam/ocarina/releases" target="_blank" rel="noopener">Releases</a>
+        &nbsp;·&nbsp;
+        MIT license
+        &nbsp;·&nbsp;
+        <a class="lk-link" href="https://thenounproject.com/browse/icons/term/whistle/" target="_blank" rel="noopener">Whistle icon</a> by Alessio Capponi / Noun Project (CC BY 3.0)
+      </p>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // ── syntax highlighting ───────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('pre code').forEach(function(block) {
+      hljs.highlightElement(block);
+    });
+  });
+
+  // ── theme toggle ──────────────────────────────────────────────────────────
+  const STOCKS = ['ink', 'paper'];
+  const LABELS = { ink: '● Ink', paper: '☀ Paper' };
+  let idx = 0;
+
+  function toggleTheme() {
+    idx = (idx + 1) % STOCKS.length;
+    const stock = STOCKS[idx];
+    document.documentElement.setAttribute('data-theme', stock);
+    document.getElementById('theme-btn').textContent = LABELS[stock];
+  }
+
+  // ── scroll-spy ────────────────────────────────────────────────────────────
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('.lk-nav-item[href^="#"]');
+
+  const observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        navLinks.forEach(function(link) {
+          link.removeAttribute('aria-current');
+          if (link.getAttribute('href') === '#' + entry.target.id) {
+            link.setAttribute('aria-current', 'page');
+          }
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(function(section) { observer.observe(section); });
+</script>
+</body>
+</html>

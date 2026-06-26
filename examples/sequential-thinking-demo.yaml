@@ -1,0 +1,50 @@
+# Sequential thinking: structured multi-step reasoning without an LLM driving the loop.
+# Each track is one thought in a chain — the server maintains no state between calls,
+# so the chain is fully explicit in the cassette. This makes the reasoning steps
+# inspectable, reproducible, and diffable.
+#
+# Shows: multi-track chaining where each call builds on the previous thought number,
+# expect: assertions on the final synthesis step, and how a "thinking process"
+# becomes a replayable artifact.
+
+notes:
+  problem: "How should ocarina handle MCP servers that return non-JSON prose responses when grab: is used?"
+
+server:
+  command: npx
+  args: [-y, "@modelcontextprotocol/server-sequential-thinking"]
+
+tracks:
+  - name: frame the problem
+    tool: sequentialthinking
+    args:
+      thought: "The problem: ocarina's grab: field uses dot-path extraction on JSON. Some MCP servers (git log, filesystem reads) return plain prose. When a user writes grab: on a prose-returning tool, the extraction silently fails or errors. Need to think about what the right behavior is."
+      thoughtNumber: 1
+      totalThoughts: 4
+      nextThoughtNeeded: true
+
+  - name: enumerate options
+    tool: sequentialthinking
+    args:
+      thought: "Three options: (1) fail fast — if grab: is set and output isn't valid JSON, error immediately with a clear message. (2) pass through — if JSON parse fails, use the raw text as-is and skip extraction. (3) warn and pass through — emit a stderr warning that grab: was skipped, use raw text. Option 1 surfaces bugs early. Option 2 is silently wrong. Option 3 is the best balance."
+      thoughtNumber: 2
+      totalThoughts: 4
+      nextThoughtNeeded: true
+
+  - name: check edge cases
+    tool: sequentialthinking
+    args:
+      thought: "Edge cases for option 3: what if the prose accidentally starts with '{' (a server that returns JSON-ish error messages)? Then JSON parse succeeds but dot-path extraction fails. Should also warn in that case. Also: grab: on an empty result — should warn separately. The warning message should include the track name, the grab path, and what the actual output looked like (truncated)."
+      thoughtNumber: 3
+      totalThoughts: 4
+      nextThoughtNeeded: true
+
+  - name: synthesize recommendation
+    tool: sequentialthinking
+    args:
+      thought: "Final recommendation: when grab: fails for any reason (JSON parse error, path not found, empty output), ocarina should (a) print a stderr warning with context, (b) set the echo: variable to empty string rather than the raw text, and (c) continue rather than aborting. This matches how shell pipelines handle failed extractions — degrade gracefully, surface the problem visibly, don't hard-stop a multi-step workflow mid-flight."
+      thoughtNumber: 4
+      totalThoughts: 4
+      nextThoughtNeeded: false
+    expect:
+      contains: "nextThoughtNeeded"

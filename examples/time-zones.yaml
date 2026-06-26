@@ -1,0 +1,40 @@
+# Demonstrates multi-city time coordination using mcp-server-time.
+# Useful for scheduling meetings across distributed teams.
+# Change notes.meeting_time to any HH:MM value to rerun for a different slot.
+#
+# Shows: notes: interpolation, sequential convert_time calls
+
+notes:
+  meeting_time: "15:00"
+  base_tz: America/New_York
+
+server:
+  command: uvx
+  args: [mcp-server-time]
+
+tracks:
+  - name: current time in New York
+    tool: get_current_time
+    args:
+      timezone: "{{base_tz}}"
+
+  - name: meeting time in London
+    tool: convert_time
+    args:
+      source_timezone: "{{base_tz}}"
+      target_timezone: Europe/London
+      time: "{{meeting_time}}"
+
+  - name: meeting time in Tokyo
+    tool: convert_time
+    args:
+      source_timezone: "{{base_tz}}"
+      target_timezone: Asia/Tokyo
+      time: "{{meeting_time}}"
+
+  - name: meeting time in San Francisco
+    tool: convert_time
+    args:
+      source_timezone: "{{base_tz}}"
+      target_timezone: America/Los_Angeles
+      time: "{{meeting_time}}"

@@ -1,0 +1,39 @@
+# notes: defines values interpolated as {{key}} throughout all tracks
+# echo: captures a track's text output into a note for later tracks
+
+notes:
+  dir: /private/tmp/ocarina-demo
+  filename: result.txt
+
+server:
+  command: npx
+  args: [-y, "@modelcontextprotocol/server-filesystem", /private/tmp]
+
+tracks:
+  - name: create working dir
+    tool: create_directory
+    args:
+      path: "{{dir}}"
+
+  - name: write initial file
+    tool: write_file
+    args:
+      path: "{{dir}}/{{filename}}"
+      content: "hello from ocarina"
+
+  - name: read it back
+    tool: read_file
+    args:
+      path: "{{dir}}/{{filename}}"
+    echo: file_contents        # captures output into notes.file_contents
+
+  - name: write a record of what we read
+    tool: write_file
+    args:
+      path: "{{dir}}/record.txt"
+      content: "we read: {{file_contents}}"
+
+  - name: verify the record
+    tool: read_file
+    args:
+      path: "{{dir}}/record.txt"

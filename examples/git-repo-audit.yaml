@@ -1,0 +1,36 @@
+# Demonstrates git repo introspection using mcp-server-git.
+# A cassette that audits any local repo: recent history, current status, staged diff.
+# Change notes.repo to point at any local git repository.
+#
+# Shows: notes: for repo path, multi-track sequential inspection
+
+notes:
+  repo: /path/to/your/repo
+
+server:
+  command: uvx
+  args: [mcp-server-git, -r, "{{repo}}"]
+
+tracks:
+  - name: recent commits
+    tool: git_log
+    args:
+      repo_path: "{{repo}}"
+      max_count: 5
+
+  - name: working tree status
+    tool: git_status
+    args:
+      repo_path: "{{repo}}"
+
+  - name: unstaged changes
+    tool: git_diff_unstaged
+    args:
+      repo_path: "{{repo}}"
+      context_lines: 2
+
+  - name: list branches
+    tool: git_branch
+    args:
+      repo_path: "{{repo}}"
+      branch_type: local

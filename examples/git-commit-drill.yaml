@@ -1,0 +1,39 @@
+# Demonstrates multi-track git introspection: status, log, then a diff
+# against a specific branch. Parameterize notes.repo and notes.target_branch
+# to run this against any local repo.
+#
+# The git_log / git_show tools return human-readable text, not JSON,
+# so grab: is not used here — echo: captures the full text output.
+
+notes:
+  repo: /path/to/your/repo
+  target_branch: HEAD~1
+
+server:
+  command: uvx
+  args: [mcp-server-git, -r, "{{repo}}"]
+
+tracks:
+  - name: recent commits
+    tool: git_log
+    args:
+      repo_path: "{{repo}}"
+      max_count: 5
+
+  - name: working tree status
+    tool: git_status
+    args:
+      repo_path: "{{repo}}"
+
+  - name: diff against previous commit
+    tool: git_diff
+    args:
+      repo_path: "{{repo}}"
+      target: "{{target_branch}}"
+      context_lines: 3
+
+  - name: show HEAD commit in full
+    tool: git_show
+    args:
+      repo_path: "{{repo}}"
+      revision: HEAD

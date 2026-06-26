@@ -1,0 +1,36 @@
+# A reusable repo investigation cassette.
+# Swap notes.owner and notes.repo to investigate any public GitHub repo.
+
+notes:
+  owner: modelcontextprotocol
+  repo: go-sdk
+
+server:
+  command: npx
+  args: [-y, "@modelcontextprotocol/server-github"]
+
+tracks:
+  - name: list recent commits
+    tool: list_commits
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+      per_page: 5
+    echo: commits_json
+    grab: ".0.sha"        # extract first commit SHA from the JSON array
+    # notes.commits_json now holds just the SHA string
+
+  - name: show latest commit
+    tool: get_commit
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+      sha: "{{commits_json}}"
+
+  - name: list open issues
+    tool: list_issues
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+      state: open
+      per_page: 5

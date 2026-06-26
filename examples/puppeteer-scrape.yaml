@@ -1,0 +1,40 @@
+# Browser automation pipeline: navigate → extract → evaluate.
+# Puppeteer runs a real headless Chromium instance, so this cassette captures
+# an actual browser session as a replayable artifact.
+#
+# Shows: multi-step browser workflow (navigate, evaluate JS, screenshot),
+# grab: extracting a field from JSON returned by puppeteer_evaluate,
+# expect: asserting page content was reachable.
+#
+# Note: puppeteer_screenshot returns base64 image data — ocarina prints
+# "[image ...]" for non-text content rather than dumping binary.
+
+notes:
+  url: https://example.com
+
+server:
+  command: npx
+  args: [-y, "@modelcontextprotocol/server-puppeteer"]
+
+tracks:
+  - name: navigate to page
+    tool: puppeteer_navigate
+    args:
+      url: "{{url}}"
+    expect:
+      contains: "example.com"
+
+  - name: extract page title via JS
+    tool: puppeteer_evaluate
+    args:
+      script: "JSON.stringify({ title: document.title, url: window.location.href, h1: document.querySelector('h1')?.textContent })"
+    echo: page_info
+    expect:
+      contains: "title"
+
+  - name: take screenshot
+    tool: puppeteer_screenshot
+    args:
+      name: example-home
+      width: 1280
+      height: 720

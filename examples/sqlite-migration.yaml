@@ -1,0 +1,62 @@
+# Demonstrates SQLite schema setup and querying via mcp-server-sqlite.
+# Runs a mini "migration + seed + report" workflow — the kind of thing
+# you'd do in a dev setup script or a data exploration session.
+# Change notes.db to any .db path; the file is created if absent.
+#
+# Shows: stateful multi-track workflows where each track builds on the last
+
+notes:
+  db: /tmp/ocarina-demo.db
+
+server:
+  command: uvx
+  args: [mcp-server-sqlite, --db-path, "{{db}}"]
+
+tracks:
+  - name: create events table
+    tool: create_table
+    args:
+      query: |
+        CREATE TABLE IF NOT EXISTS events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          ts TEXT NOT NULL,
+          severity TEXT CHECK(severity IN ('info','warn','error')) DEFAULT 'info'
+        )
+
+  - name: seed sample events
+    tool: write_query
+    args:
+      query: |
+        INSERT INTO events (name, ts, severity) VALUES
+          ('deploy.started',  '2026-06-26T08:00:00Z', 'info'),
+          ('health.check',    '2026-06-26T08:01:00Z', 'info'),
+          ('latency.spike',   '2026-06-26T08:03:00Z', 'warn'),
+          ('error.rate.high', '2026-06-26T08:05:00Z', 'error'),
+          ('deploy.complete', '2026-06-26T08:07:00Z', 'info')
+
+  - name: list tables
+    tool: list_tables
+
+  - name: describe events schema
+    tool: describe_table
+    args:
+      table_name: events
+
+  - name: query errors and warnings
+    tool: read_query
+    args:
+      query: |
+        SELECT ts, name, severity
+        FROM events
+        WHERE severity != 'info'
+        ORDER BY ts
+
+  - name: event count by severity
+    tool: read_query
+    args:
+      query: |
+        SELECT severity, COUNT(*) AS count
+        FROM events
+        GROUP BY severity
+        ORDER BY count DESC

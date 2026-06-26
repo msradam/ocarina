@@ -1,0 +1,47 @@
+# A smoke test cassette using the official MCP reference server.
+# server-everything is designed to exercise every MCP content type and
+# capability. Running this cassette in CI verifies that your MCP client
+# stack (transport, content parsing, tool dispatch) is intact.
+#
+# This is the "cassette as regression test" pattern: record once against
+# a known-good server, replay in CI without an LLM.
+#
+# Shows: structured JSON output via get-structured-content,
+#         arithmetic via get-sum, and echo: capture for assertion-style checks.
+
+server:
+  command: npx
+  args: [-y, "@modelcontextprotocol/server-everything"]
+
+tracks:
+  - name: echo round-trip
+    tool: echo
+    args:
+      message: "ocarina smoke test"
+    echo: echo_result
+    expect:
+      contains: "ocarina smoke test"
+
+  - name: integer sum
+    tool: get-sum
+    args:
+      a: 17
+      b: 25
+    echo: sum_result
+    expect:
+      contains: "42"
+
+  - name: structured JSON content
+    tool: get-structured-content
+    args:
+      location: "New York"
+
+  - name: annotated success message
+    tool: get-annotated-message
+    args:
+      messageType: success
+
+  - name: annotated error message
+    tool: get-annotated-message
+    args:
+      messageType: error

@@ -1,0 +1,16 @@
+server:
+  command: uvx
+  args: [mcp-server-fetch]
+
+tracks:
+  - name: fetch example.com
+    tool: fetch
+    args:
+      url: https://example.com
+      max_length: 500
+
+  - name: fetch modelcontextprotocol.io intro
+    tool: fetch
+    args:
+      url: https://modelcontextprotocol.io
+      max_length: 800

@@ -1,0 +1,91 @@
+# Knowledge graph lifecycle: create entities and relations, query them, clean up.
+# Demonstrates stateful multi-track workflows where each track builds on server-side
+# state from previous tracks. The memory server stores a knowledge graph in-process,
+# so the full create → relate → search → delete cycle is captured as a single cassette.
+#
+# Parameterize notes.project to model any software project's dependency graph.
+# Shows: create_entities, create_relations, search_nodes, open_nodes, delete_entities.
+
+notes:
+  project: ocarina
+
+server:
+  command: npx
+  args: [-y, "@modelcontextprotocol/server-memory"]
+
+tracks:
+  - name: create core entities
+    tool: create_entities
+    args:
+      entities:
+        - name: "{{project}}"
+          entityType: project
+          observations:
+            - "Go CLI tool for recording and replaying MCP sessions"
+            - "Three commands: record, compose, play"
+        - name: go-sdk
+          entityType: library
+          observations:
+            - "Official MCP Go SDK by modelcontextprotocol"
+            - "Version 1.6.1"
+        - name: cobra
+          entityType: library
+          observations:
+            - "CLI framework for Go"
+        - name: gopkg.in/yaml.v3
+          entityType: library
+          observations:
+            - "YAML serialization for cassette files"
+    expect:
+      contains: "entityType"
+
+  - name: create dependency relations
+    tool: create_relations
+    args:
+      relations:
+        - from: "{{project}}"
+          to: go-sdk
+          relationType: depends_on
+        - from: "{{project}}"
+          to: cobra
+          relationType: depends_on
+        - from: "{{project}}"
+          to: gopkg.in/yaml.v3
+          relationType: depends_on
+    expect:
+      contains: "relationType"
+
+  - name: search for MCP-related nodes
+    tool: search_nodes
+    args:
+      query: MCP
+    expect:
+      contains: "ocarina"
+
+  - name: open project node
+    tool: open_nodes
+    args:
+      names: ["{{project}}"]
+    expect:
+      contains: "record"
+
+  - name: add observation to library
+    tool: add_observations
+    args:
+      observations:
+        - entityName: go-sdk
+          contents:
+            - "Provides CommandTransport for stdio-based MCP servers"
+            - "ClientSession.CallTool and ListTools are the main entry points"
+
+  - name: read full graph
+    tool: read_graph
+    expect:
+      contains: "depends_on"
+
+  - name: clean up project entity
+    tool: delete_entities
+    args:
+      entityNames: ["{{project}}", "go-sdk", "cobra", "gopkg.in/yaml.v3"]
+    expect:
+      contains: "deleted"
