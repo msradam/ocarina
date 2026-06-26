@@ -1,0 +1,35 @@
+notes:
+  qdrant_url: http://localhost:6333
+  collection: ocarina-demo
+
+server:
+  command: uvx
+  args: ["mcp-server-qdrant"]
+  env:
+    QDRANT_URL: "{{qdrant_url}}"
+    COLLECTION_NAME: "{{collection}}"
+
+tracks:
+  - name: store a fact
+    tool: qdrant-store
+    args:
+      information: Ocarina records MCP tool calls as YAML cassettes for deterministic replay
+
+  - name: store another fact
+    tool: qdrant-store
+    args:
+      information: Qdrant is a vector database that enables semantic search
+
+  - name: recall by semantic query
+    tool: qdrant-find
+    args:
+      query: YAML recording tool
+    expect:
+      contains: Ocarina
+
+  - name: recall about databases
+    tool: qdrant-find
+    args:
+      query: vector similarity search
+    expect:
+      contains: Qdrant

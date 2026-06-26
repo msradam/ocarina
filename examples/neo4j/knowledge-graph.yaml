@@ -1,0 +1,27 @@
+notes: {}
+
+server:
+  command: uvx
+  args: ["mcp-neo4j-cypher"]
+  env:
+    NEO4J_URI: bolt://localhost:7687
+
+tracks:
+  - name: create people graph
+    tool: write_neo4j_cypher
+    args:
+      query: "CREATE (a:Person {name: 'Alice'})-[:KNOWS]->(b:Person {name: 'Bob'})-[:KNOWS]->(c:Person {name: 'Carol'}) RETURN a.name, b.name, c.name"
+
+  - name: find all people
+    tool: read_neo4j_cypher
+    args:
+      query: "MATCH (p:Person) RETURN p.name ORDER BY p.name"
+    expect:
+      contains: Alice
+
+  - name: traverse relationships
+    tool: read_neo4j_cypher
+    args:
+      query: "MATCH (a:Person)-[:KNOWS]->(b:Person) RETURN a.name + ' knows ' + b.name AS relationship"
+    expect:
+      contains: knows

@@ -1,0 +1,44 @@
+notes:
+  neo4j_uri: bolt://localhost:7687
+
+server:
+  command: uvx
+  args: ["mcp-neo4j-cypher"]
+  env:
+    NEO4J_URI: "{{neo4j_uri}}"
+
+tracks:
+  - name: create people nodes
+    tool: write_neo4j_cypher
+    args:
+      query: |
+        CREATE (alice:Person {name: 'Alice', role: 'Engineer'}),
+               (bob:Person {name: 'Bob', role: 'Designer'}),
+               (carol:Person {name: 'Carol', role: 'PM'})
+        RETURN count(*) as created
+    expect:
+      contains: created
+
+  - name: create relationships
+    tool: write_neo4j_cypher
+    args:
+      query: |
+        MATCH (alice:Person {name: 'Alice'}), (bob:Person {name: 'Bob'})
+        CREATE (alice)-[:COLLABORATES_WITH]->(bob)
+        RETURN count(*) as links
+
+  - name: query team members
+    tool: read_neo4j_cypher
+    args:
+      query: MATCH (n:Person) RETURN n.name as name, n.role as role ORDER BY n.name
+    expect:
+      contains: Alice
+
+  - name: traverse relationships
+    tool: read_neo4j_cypher
+    args:
+      query: |
+        MATCH (p:Person)-[:COLLABORATES_WITH]->(colleague:Person)
+        RETURN p.name as person, colleague.name as collaborator
+    expect:
+      contains: Bob
