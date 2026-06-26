@@ -1,0 +1,18 @@
+notes:
+  file: /path/to/workbook.xlsx
+
+server:
+  command: npx
+  args: ["-y", "@negokaz/excel-mcp-server"]
+
+tracks:
+  - name: describe sheets
+    tool: excel_describe_sheets
+    args:
+      fileAbsolutePath: "{{file}}"
+
+  - name: read first sheet
+    tool: excel_read_sheet
+    args:
+      fileAbsolutePath: "{{file}}"
+      sheetName: Sheet1

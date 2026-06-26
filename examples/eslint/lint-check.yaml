@@ -1,0 +1,14 @@
+notes:
+  target: /tmp/eslint-test/test.js
+
+server:
+  command: npx
+  args: ["-y", "@eslint/mcp"]
+
+tracks:
+  - name: lint JavaScript file
+    tool: lint-files
+    args:
+      filePaths: ["{{target}}"]
+    expect:
+      contains: no-var
