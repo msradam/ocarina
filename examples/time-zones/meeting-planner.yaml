@@ -1,5 +1,5 @@
 notes:
-  source_time: "2024-03-15 14:00"
+  meeting_time: "14:00"
   source_tz: America/New_York
 
 server:
@@ -17,21 +17,21 @@ tracks:
   - name: same time in London
     tool: convert_time
     args:
-      source_time: "{{source_time}}"
+      time: "{{meeting_time}}"
       source_timezone: "{{source_tz}}"
       target_timezone: Europe/London
 
   - name: same time in Tokyo
     tool: convert_time
     args:
-      source_time: "{{source_time}}"
+      time: "{{meeting_time}}"
       source_timezone: "{{source_tz}}"
       target_timezone: Asia/Tokyo
 
   - name: same time in San Francisco
     tool: convert_time
     args:
-      source_time: "{{source_time}}"
+      time: "{{meeting_time}}"
       source_timezone: "{{source_tz}}"
       target_timezone: America/Los_Angeles
     expect:
