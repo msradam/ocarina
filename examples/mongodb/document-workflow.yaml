@@ -1,0 +1,53 @@
+notes:
+  db: testdb
+  collection: products
+
+server:
+  command: npx
+  args: ["-y", "mongodb-mcp-server"]
+  env:
+    MDB_MCP_CONNECTION_STRING: mongodb://admin:testpass@localhost:27017
+
+tracks:
+  - name: list databases
+    tool: list-databases
+    args: {}
+    expect:
+      contains: admin
+
+  - name: insert products
+    tool: insert-many
+    args:
+      database: "{{db}}"
+      collection: "{{collection}}"
+      documents:
+        - name: Widget Pro
+          price: 49.99
+          category: hardware
+        - name: Gadget Plus
+          price: 129.00
+          category: hardware
+        - name: Cloud Suite
+          price: 299.00
+          category: software
+
+  - name: find hardware products
+    tool: find
+    args:
+      database: "{{db}}"
+      collection: "{{collection}}"
+      filter:
+        category: hardware
+    expect:
+      contains: Widget Pro
+
+  - name: find by price range
+    tool: find
+    args:
+      database: "{{db}}"
+      collection: "{{collection}}"
+      filter:
+        price:
+          $gt: 100
+    expect:
+      contains: Gadget Plus

@@ -1,0 +1,35 @@
+notes:
+  prefix: "ocarina"
+
+server:
+  command: uvx
+  args: ["redis-mcp"]
+  env:
+    REDIS_URL: redis://localhost:6379
+
+tracks:
+  - name: cache a value
+    tool: set
+    args:
+      key: "{{prefix}}:greeting"
+      value: "hello from ocarina"
+
+  - name: cache another value
+    tool: set
+    args:
+      key: "{{prefix}}:version"
+      value: "0.1.0"
+
+  - name: retrieve greeting
+    tool: get
+    args:
+      key: "{{prefix}}:greeting"
+    expect:
+      contains: ocarina
+
+  - name: list all cached keys
+    tool: list
+    args:
+      pattern: "{{prefix}}:*"
+    expect:
+      contains: "{{prefix}}:version"

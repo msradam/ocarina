@@ -1,0 +1,41 @@
+notes:
+  conn: postgresql://postgres:testpass@localhost:5432/testdb
+
+server:
+  command: npx
+  args: ["-y", "@modelcontextprotocol/server-postgres", "{{conn}}"]
+
+tracks:
+  - name: check connection and version
+    tool: query
+    args:
+      sql: "SELECT version() as pg_version"
+    expect:
+      contains: PostgreSQL
+
+  - name: create users table
+    tool: query
+    args:
+      sql: |
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT now()
+        )
+
+  - name: insert sample users
+    tool: query
+    args:
+      sql: |
+        INSERT INTO users (name, email) VALUES
+          ('Alice', 'alice@example.com'),
+          ('Bob', 'bob@example.com')
+        ON CONFLICT (email) DO NOTHING
+
+  - name: query users
+    tool: query
+    args:
+      sql: "SELECT id, name, email FROM users ORDER BY id"
+    expect:
+      contains: Alice
