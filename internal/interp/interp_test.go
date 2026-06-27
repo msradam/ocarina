@@ -113,3 +113,34 @@ func TestGrabErrors(t *testing.T) {
 		t.Fatal("expected error for out-of-range index")
 	}
 }
+
+func TestApplyNestedDeterministic(t *testing.T) {
+	vars := map[string]string{"a": "{{b}}", "b": "RESOLVED"}
+	// Run many times: map iteration order is randomized, result must not be.
+	for i := 0; i < 100; i++ {
+		if got := Apply("{{a}}", vars).(string); got != "RESOLVED" {
+			t.Fatalf("nested interpolation not deterministic: got %q on iteration %d", got, i)
+		}
+	}
+}
+
+func TestApplyCycleTerminates(t *testing.T) {
+	vars := map[string]string{"a": "{{b}}", "b": "{{a}}"}
+	// Must not loop forever; leftover placeholder is acceptable.
+	_ = Apply("{{a}}", vars).(string)
+}
+
+func TestUnresolved(t *testing.T) {
+	args := map[string]any{
+		"x": "hello {{missing}} world",
+		"y": "fine",
+		"z": []any{"{{also_missing}}", 3},
+	}
+	got := Unresolved(args)
+	if len(got) != 2 || got[0] != "{{also_missing}}" || got[1] != "{{missing}}" {
+		t.Fatalf("Unresolved = %v, want [{{also_missing}} {{missing}}]", got)
+	}
+	if u := Unresolved(map[string]any{"x": "all resolved"}); len(u) != 0 {
+		t.Fatalf("expected no unresolved, got %v", u)
+	}
+}

@@ -64,19 +64,55 @@ Example:
 		skipTags := tagSet(mustStringArray(cmd, "skip-tags"))
 
 		ctx := context.Background()
-		if err := resolveServer(&c.Server); err != nil {
-			return err
-		}
-		serverArgs := interp.Strings(c.Server.Args, notes)
-		serverEnv := interp.StringMap(c.Server.Env, notes)
-		if c.Server.Command == "" {
+		if len(c.Servers) == 0 {
 			return fmt.Errorf("rondo is missing a server: block")
 		}
-		sess, err := mcpclient.Connect(ctx, c.Server.Command, serverArgs, serverEnv)
-		if err != nil {
-			return fmt.Errorf("connect: %w", err)
+
+		// Connect to each referenced server once, lazily, and reuse the session.
+		sessions := make(map[string]*mcp.ClientSession)
+		toolReq := make(map[string]map[string][]string) // server -> tool -> required args (nil entry = tool absent)
+		defer func() {
+			for _, s := range sessions {
+				s.Close()
+			}
+		}()
+		getSession := func(key string) (*mcp.ClientSession, error) {
+			if s, ok := sessions[key]; ok {
+				return s, nil
+			}
+			srv, ok := c.Servers[key]
+			if !ok {
+				return nil, fmt.Errorf("step references server %q, which is not defined in the servers map", key)
+			}
+			if err := resolveServer(&srv); err != nil {
+				return nil, err
+			}
+			if srv.Command == "" {
+				return nil, fmt.Errorf("server %q has no command", key)
+			}
+			s, err := mcpclient.Connect(ctx, srv.Command, interp.Strings(srv.Args, notes), interp.StringMap(srv.Env, notes))
+			if err != nil {
+				return nil, fmt.Errorf("connect %q: %w", key, err)
+			}
+			sessions[key] = s
+			if res, lerr := s.ListTools(ctx, nil); lerr == nil {
+				tools := make(map[string][]string, len(res.Tools))
+				for _, t := range res.Tools {
+					var req []string
+					if t.InputSchema != nil {
+						raw, _ := json.Marshal(t.InputSchema)
+						var sc struct {
+							Required []string `json:"required"`
+						}
+						_ = json.Unmarshal(raw, &sc)
+						req = sc.Required
+					}
+					tools[t.Name] = req
+				}
+				toolReq[key] = tools
+			}
+			return s, nil
 		}
-		defer sess.Close()
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		var failures []string
@@ -93,7 +129,13 @@ Example:
 
 			items, err := resolveLoop(step.Loop, notes)
 			if err != nil {
-				return fmt.Errorf("step %q loop: %w", name, err)
+				if step.IgnoreErrors {
+					fmt.Fprintf(os.Stdout, "%s %s\n    %s %v\n\n", boldCyan("==>"), name, red("error:"), err)
+					continue
+				}
+				fmt.Fprintf(os.Stderr, "%s %s\n    %s %v\n\n", boldCyan("==>"), name, red("error:"), err)
+				failures = append(failures, fmt.Sprintf("step %q loop: %v", name, err))
+				continue
 			}
 
 			for _, item := range items {
@@ -114,7 +156,11 @@ Example:
 					continue
 				}
 
+				dispServer := c.StepServerKey(step)
 				label := stepLabel(step)
+				if c.MultiServer() && (step.Tool != "" || step.Resource != "" || step.ListResources != "") {
+					label = dispServer + "." + label
+				}
 				if item != "" {
 					label += fmt.Sprintf(" [%s]", truncate(item, 40))
 				}
@@ -141,8 +187,51 @@ Example:
 				stepCtx := ctx
 				var cancelFn context.CancelFunc
 				if step.Timeout != "" {
-					if d, parseErr := time.ParseDuration(step.Timeout); parseErr == nil {
-						stepCtx, cancelFn = context.WithTimeout(ctx, d)
+					d, parseErr := time.ParseDuration(step.Timeout)
+					if parseErr != nil {
+						fmt.Fprintf(os.Stderr, "    %s invalid timeout %q: %v\n\n", red("error:"), step.Timeout, parseErr)
+						failures = append(failures, fmt.Sprintf("step %q: invalid timeout %q", name, step.Timeout))
+						continue
+					}
+					stepCtx, cancelFn = context.WithTimeout(ctx, d)
+				}
+
+				sess, sessErr := getSession(dispServer)
+				if sessErr != nil {
+					if cancelFn != nil {
+						cancelFn()
+					}
+					fmt.Fprintf(os.Stderr, "    %s %v\n\n", red("error:"), sessErr)
+					failures = append(failures, fmt.Sprintf("step %q: %v", name, sessErr))
+					continue
+				}
+
+				// Static check against the live schema: a typo'd tool or a missing
+				// required arg is a deterministic failure, not a green run.
+				if tools, ok := toolReq[dispServer]; ok && step.Tool != "" {
+					req, found := tools[step.Tool]
+					var schemaErr string
+					if !found {
+						schemaErr = fmt.Sprintf("tool %q not found on server %q", step.Tool, dispServer)
+					} else {
+						for _, r := range req {
+							if _, present := step.Args[r]; !present {
+								schemaErr = fmt.Sprintf("missing required arg %q for tool %q", r, step.Tool)
+								break
+							}
+						}
+					}
+					if schemaErr != "" {
+						if cancelFn != nil {
+							cancelFn()
+						}
+						if step.IgnoreErrors {
+							fmt.Fprintf(os.Stdout, "    %s %s\n\n", red("error:"), schemaErr)
+							continue
+						}
+						fmt.Fprintf(os.Stderr, "    %s %s\n\n", red("error:"), schemaErr)
+						failures = append(failures, fmt.Sprintf("step %q: %s", name, schemaErr))
+						continue
 					}
 				}
 
@@ -176,6 +265,11 @@ Example:
 				if step.Grab != "" {
 					extracted, grabErr := interp.Grab(captured, step.Grab)
 					if grabErr != nil {
+						if !step.IgnoreErrors {
+							fmt.Fprintf(os.Stderr, "    %s %v\n\n", red("error:"), grabErr)
+							failures = append(failures, fmt.Sprintf("step %q: %v", name, grabErr))
+							continue
+						}
 						fmt.Fprintf(os.Stderr, "    %s %v\n", yellowPlay("grab:"), grabErr)
 					} else {
 						captured = extracted
@@ -207,7 +301,7 @@ Example:
 		}
 
 		if len(failures) > 0 {
-			return fmt.Errorf("%d expectation(s) failed", len(failures))
+			return fmt.Errorf("%d step(s) failed", len(failures))
 		}
 		return nil
 	},
@@ -296,6 +390,9 @@ func callTool(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, not
 	if callArgs == nil {
 		callArgs = map[string]any{}
 	}
+	if leftover := interp.Unresolved(callArgs); len(leftover) > 0 {
+		return "", false, fmt.Errorf("unresolved %s, not defined in keys or set by a prior echo", strings.Join(leftover, ", "))
+	}
 
 	result, err := sess.CallTool(ctx, &mcp.CallToolParams{
 		Name:      step.Tool,
@@ -329,6 +426,9 @@ func callTool(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, not
 
 func readResource(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, notes map[string]string) (string, bool, error) {
 	uri := interp.Apply(step.Resource, notes).(string)
+	if leftover := interp.Unresolved(uri); len(leftover) > 0 {
+		return "", false, fmt.Errorf("unresolved %s, not defined in keys or set by a prior echo", strings.Join(leftover, ", "))
+	}
 	result, err := sess.ReadResource(ctx, &mcp.ReadResourceParams{URI: uri})
 	if err != nil {
 		return "", false, err
@@ -461,7 +561,8 @@ func dryRunDetail(t rondo.Step, notes map[string]string) string {
 	switch {
 	case t.Tool != "":
 		resolved, _ := interp.Apply(t.Args, notes).(map[string]any)
-		return fmt.Sprintf("tool=%s args=%v", t.Tool, resolved)
+		args, _ := json.Marshal(resolved)
+		return fmt.Sprintf("tool=%s args=%s", t.Tool, args)
 	case t.Resource != "":
 		return fmt.Sprintf("resource=%s", interp.Apply(t.Resource, notes).(string))
 	case t.ListResources != "":
@@ -532,10 +633,9 @@ func colorOutput(s string) string {
 
 	var parsed any
 
-	// try proper JSON first
 	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
 		// try converting Python dict repr: True/False/None and single-quoted strings
-		if converted := pyReprToJSON(trimmed); converted != "" {
+		if converted := interp.PyReprToJSON(trimmed); converted != "" {
 			if err2 := json.Unmarshal([]byte(converted), &parsed); err2 != nil {
 				return s
 			}
@@ -545,38 +645,6 @@ func colorOutput(s string) string {
 	}
 
 	return renderColor(parsed, "")
-}
-
-// pyReprToJSON converts Python dict/list repr to JSON. Only handles the common
-// case where string values contain no embedded single quotes.
-func pyReprToJSON(s string) string {
-	if len(s) == 0 || (s[0] != '[' && s[0] != '{') {
-		return ""
-	}
-	s = strings.NewReplacer(
-		": True", ": true",
-		": False", ": false",
-		": None", ": null",
-		"[True", "[true",
-		"[False", "[false",
-		"[None", "[null",
-	).Replace(s)
-	// swap single-quoted strings to double-quoted
-	var b strings.Builder
-	inSingle := false
-	for _, c := range s {
-		switch {
-		case c == '\'' && !inSingle:
-			inSingle = true
-			b.WriteRune('"')
-		case c == '\'' && inSingle:
-			inSingle = false
-			b.WriteRune('"')
-		default:
-			b.WriteRune(c)
-		}
-	}
-	return b.String()
 }
 
 func renderColor(v any, indent string) string {

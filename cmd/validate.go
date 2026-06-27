@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	jschema "github.com/google/jsonschema-go/jsonschema"
@@ -16,7 +18,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var templateKeyRe = regexp.MustCompile(`\{\{(\w+)\}\}`)
+var templateKeyRe = regexp.MustCompile(`\{\{([\w.]+)\}\}`)
 
 var (
 	okLabel   = color.New(color.FgGreen, color.Bold).Sprint("OK")
@@ -46,23 +48,8 @@ Example:
 		}
 
 		ctx := context.Background()
-		if err := resolveServer(&c.Server); err != nil {
-			return err
-		}
-		serverArgs := interp.Strings(c.Server.Args, c.Keys)
-		serverEnv := interp.StringMap(c.Server.Env, c.Keys)
-		if c.Server.Command == "" {
+		if len(c.Servers) == 0 {
 			return fmt.Errorf("rondo is missing a server: block")
-		}
-		sess, err := mcpclient.Connect(ctx, c.Server.Command, serverArgs, serverEnv)
-		if err != nil {
-			return fmt.Errorf("connect: %w", err)
-		}
-		defer sess.Close()
-
-		res, err := sess.ListTools(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("list tools: %w", err)
 		}
 
 		type schemaEntry struct {
@@ -70,26 +57,51 @@ Example:
 			properties map[string]struct{ typ string }
 			raw        []byte
 		}
-		schemas := make(map[string]schemaEntry)
-		for _, t := range res.Tools {
-			entry := schemaEntry{}
-			if t.InputSchema != nil {
-				raw, _ := json.Marshal(t.InputSchema)
-				entry.raw = raw
-				var s struct {
-					Required   []string `json:"required"`
-					Properties map[string]struct {
-						Type string `json:"type"`
-					} `json:"properties"`
-				}
-				_ = json.Unmarshal(raw, &s)
-				entry.required = s.Required
-				entry.properties = make(map[string]struct{ typ string }, len(s.Properties))
-				for k, p := range s.Properties {
-					entry.properties[k] = struct{ typ string }{p.Type}
-				}
+		// schemas[serverKey][toolName]
+		schemas := make(map[string]map[string]schemaEntry)
+		for key := range referencedServerKeys(c) {
+			srv, ok := c.Servers[key]
+			if !ok {
+				continue // undefined reference; reported per-step below
 			}
-			schemas[t.Name] = entry
+			if err := resolveServer(&srv); err != nil {
+				return err
+			}
+			if srv.Command == "" {
+				return fmt.Errorf("server %q has no command", key)
+			}
+			sess, err := mcpclient.Connect(ctx, srv.Command, interp.Strings(srv.Args, c.Keys), interp.StringMap(srv.Env, c.Keys))
+			if err != nil {
+				return fmt.Errorf("connect %q: %w", key, err)
+			}
+			defer sess.Close()
+
+			res, err := sess.ListTools(ctx, nil)
+			if err != nil {
+				return fmt.Errorf("list tools (%s): %w", key, err)
+			}
+
+			schemas[key] = make(map[string]schemaEntry)
+			for _, t := range res.Tools {
+				entry := schemaEntry{}
+				if t.InputSchema != nil {
+					raw, _ := json.Marshal(t.InputSchema)
+					entry.raw = raw
+					var s struct {
+						Required   []string `json:"required"`
+						Properties map[string]struct {
+							Type string `json:"type"`
+						} `json:"properties"`
+					}
+					_ = json.Unmarshal(raw, &s)
+					entry.required = s.Required
+					entry.properties = make(map[string]struct{ typ string }, len(s.Properties))
+					for k, p := range s.Properties {
+						entry.properties[k] = struct{ typ string }{p.Type}
+					}
+				}
+				schemas[key][t.Name] = entry
+			}
 		}
 
 		// data-flow: keys available via keys: + prior echo: fields
@@ -110,15 +122,32 @@ Example:
 
 			var errs, warns []string
 
-			// step must have exactly one action
+			// step must declare an action (tool, resource, list_resources, or sleep)
 			if step.Tool == "" && step.Resource == "" && step.ListResources == "" && step.Sleep == "" {
 				errs = append(errs, "step has no tool, resource, list_resources, or sleep field")
 			}
 
-			if step.Tool != "" {
-				entry, found := schemas[step.Tool]
+			serverKey := c.StepServerKey(step)
+			serverSchemas, serverKnown := schemas[serverKey]
+			if !serverKnown {
+				errs = append(errs, fmt.Sprintf("references server %q, which is not defined in servers:", serverKey))
+			}
+
+			if step.Timeout != "" {
+				if _, err := time.ParseDuration(step.Timeout); err != nil {
+					errs = append(errs, fmt.Sprintf("invalid timeout %q: %v", step.Timeout, err))
+				}
+			}
+
+			// loop: injects {{item}} into scope for this step's args
+			if step.Loop != "" {
+				available["item"] = true
+			}
+
+			if step.Tool != "" && serverKnown {
+				entry, found := serverSchemas[step.Tool]
 				if !found {
-					errs = append(errs, fmt.Sprintf("tool %q not found on server", step.Tool))
+					errs = append(errs, fmt.Sprintf("tool %q not found on server %q", step.Tool, serverKey))
 				} else {
 					for _, req := range entry.required {
 						if _, ok := step.Args[req]; !ok {
@@ -161,6 +190,9 @@ Example:
 					}
 					for _, m := range templateKeyRe.FindAllStringSubmatch(s, -1) {
 						key := m[1]
+						if strings.HasPrefix(key, "env.") {
+							continue // {{env.X}} resolves from the process environment at run time
+						}
 						if !available[key] {
 							errs = append(errs, fmt.Sprintf("arg %q: {{%s}} not defined in keys: and no prior step sets it via echo:", arg, key))
 						}
@@ -172,6 +204,9 @@ Example:
 			if step.Resource != "" {
 				for _, m := range templateKeyRe.FindAllStringSubmatch(step.Resource, -1) {
 					key := m[1]
+					if strings.HasPrefix(key, "env.") {
+						continue
+					}
 					if !available[key] {
 						errs = append(errs, fmt.Sprintf("resource URI: {{%s}} not defined in keys: and no prior step sets it via echo:", key))
 					}
@@ -214,6 +249,10 @@ Example:
 
 			totalErrs += len(errs)
 			totalWarns += len(warns)
+
+			if step.Loop != "" {
+				delete(available, "item")
+			}
 
 			if step.Echo != "" {
 				available[step.Echo] = true

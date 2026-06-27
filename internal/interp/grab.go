@@ -26,7 +26,13 @@ func Grab(jsonText, path string) (string, error) {
 
 	trimmed := strings.TrimSpace(jsonText)
 	if !gjson.Valid(trimmed) {
-		return "", fmt.Errorf("grab: output is not valid JSON")
+		// Some servers (e.g. mcp-server-sqlite) emit Python repr, not JSON.
+		// Normalize it the same way the display layer does before giving up.
+		if converted := PyReprToJSON(trimmed); converted != "" && gjson.Valid(converted) {
+			trimmed = converted
+		} else {
+			return "", fmt.Errorf("grab: output is not valid JSON")
+		}
 	}
 
 	result := gjson.Get(trimmed, path)

@@ -24,6 +24,20 @@ func resolveServer(s *rondo.Server) error {
 	return nil
 }
 
+// referencedServerKeys returns the set of server keys that action steps target,
+// so validate/diff connect only to servers the rondo actually uses (matching
+// play's lazy connect). Undefined references are reported per-step, not here.
+func referencedServerKeys(f *rondo.File) map[string]bool {
+	keys := make(map[string]bool)
+	for _, step := range f.Steps {
+		if step.Tool == "" && step.Resource == "" && step.ListResources == "" {
+			continue
+		}
+		keys[f.StepServerKey(step)] = true
+	}
+	return keys
+}
+
 // resolveServerArgs resolves a CLI-specified server: either a known name from
 // mcp.json or a literal command with its args. Returns command, args, env.
 func resolveServerArgs(args []string) (cmd string, sArgs []string, env map[string]string, err error) {

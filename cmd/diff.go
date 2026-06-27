@@ -33,73 +33,103 @@ Example:
 		}
 
 		ctx := context.Background()
-		if err := resolveServer(&r.Server); err != nil {
-			return err
-		}
-		serverArgs := interp.Strings(r.Server.Args, r.Keys)
-		serverEnv := interp.StringMap(r.Server.Env, r.Keys)
-		sess, err := mcpclient.Connect(ctx, r.Server.Command, serverArgs, serverEnv)
-		if err != nil {
-			return fmt.Errorf("connect: %w", err)
-		}
-		defer sess.Close()
-
-		res, err := sess.ListTools(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("list tools: %w", err)
+		if len(r.Servers) == 0 {
+			return fmt.Errorf("rondo is missing a server: block")
 		}
 
 		type liveTool struct {
 			required   map[string]bool
 			properties map[string]bool
 		}
-		live := make(map[string]liveTool, len(res.Tools))
-		for _, t := range res.Tools {
-			lt := liveTool{
-				required:   make(map[string]bool),
-				properties: make(map[string]bool),
+		// live[serverKey][toolName]
+		live := make(map[string]map[string]liveTool)
+		for key := range referencedServerKeys(r) {
+			srv, ok := r.Servers[key]
+			if !ok {
+				continue // undefined reference; reported per-step below
 			}
-			if t.InputSchema != nil {
-				raw, _ := json.Marshal(t.InputSchema)
-				var s struct {
-					Required   []string       `json:"required"`
-					Properties map[string]any `json:"properties"`
-				}
-				if json.Unmarshal(raw, &s) == nil {
-					for _, req := range s.Required {
-						lt.required[req] = true
-					}
-					for k := range s.Properties {
-						lt.properties[k] = true
-					}
-				}
+			if err := resolveServer(&srv); err != nil {
+				return err
 			}
-			live[t.Name] = lt
+			if srv.Command == "" {
+				return fmt.Errorf("server %q has no command", key)
+			}
+			sess, err := mcpclient.Connect(ctx, srv.Command, interp.Strings(srv.Args, r.Keys), interp.StringMap(srv.Env, r.Keys))
+			if err != nil {
+				return fmt.Errorf("connect %q: %w", key, err)
+			}
+			defer sess.Close()
+
+			res, err := sess.ListTools(ctx, nil)
+			if err != nil {
+				return fmt.Errorf("list tools (%s): %w", key, err)
+			}
+
+			live[key] = make(map[string]liveTool, len(res.Tools))
+			for _, t := range res.Tools {
+				lt := liveTool{
+					required:   make(map[string]bool),
+					properties: make(map[string]bool),
+				}
+				if t.InputSchema != nil {
+					raw, _ := json.Marshal(t.InputSchema)
+					var s struct {
+						Required   []string       `json:"required"`
+						Properties map[string]any `json:"properties"`
+					}
+					if json.Unmarshal(raw, &s) == nil {
+						for _, req := range s.Required {
+							lt.required[req] = true
+						}
+						for k := range s.Properties {
+							lt.properties[k] = true
+						}
+					}
+				}
+				live[key][t.Name] = lt
+			}
 		}
 
-		// collect tools used by the rondo
-		usedTools := make(map[string]bool)
-		for _, step := range r.Steps {
-			if step.Tool != "" {
-				usedTools[step.Tool] = true
+		multi := r.MultiServer()
+		ref := func(key, tool string) string {
+			if multi {
+				return key + "." + tool
 			}
+			return tool
+		}
+
+		// collect tools used by the rondo, per server
+		usedTools := make(map[string]bool) // key "serverKey\x00tool"
+		for _, step := range r.Steps {
+			if step.Tool == "" {
+				continue
+			}
+			usedTools[r.StepServerKey(step)+"\x00"+step.Tool] = true
 		}
 
 		removed := false
+		undefinedRef := false
 		printed := make(map[string]bool)
 
 		for _, step := range r.Steps {
 			if step.Tool == "" {
 				continue
 			}
-			if printed[step.Tool] {
+			key := r.StepServerKey(step)
+			if printed[key+"\x00"+step.Tool] {
 				continue
 			}
-			printed[step.Tool] = true
+			printed[key+"\x00"+step.Tool] = true
 
-			lt, found := live[step.Tool]
+			if _, defined := r.Servers[key]; !defined {
+				fmt.Fprintf(os.Stdout, "%s  %s (server %q not defined in servers:)\n", color.RedString("UNDEFINED"), ref(key, step.Tool), key)
+				undefinedRef = true
+				continue
+			}
+
+			lt, found := live[key][step.Tool]
 			if !found {
-				fmt.Fprintf(os.Stdout, "%s  %s\n", color.RedString("REMOVED "), step.Tool)
+				fmt.Fprintf(os.Stdout, "%s  %s\n", color.RedString("REMOVED "), ref(key, step.Tool))
 				removed = true
 				continue
 			}
@@ -117,21 +147,26 @@ Example:
 			}
 
 			if len(issues) == 0 {
-				fmt.Fprintf(os.Stdout, "%s  %s\n", color.GreenString("OK      "), step.Tool)
+				fmt.Fprintf(os.Stdout, "%s  %s\n", color.GreenString("OK      "), ref(key, step.Tool))
 			} else {
 				for _, iss := range issues {
-					fmt.Fprintf(os.Stdout, "%s  %s: %s\n", color.YellowString("WARN    "), step.Tool, iss)
+					fmt.Fprintf(os.Stdout, "%s  %s: %s\n", color.YellowString("WARN    "), ref(key, step.Tool), iss)
 				}
 			}
 		}
 
-		// new tools the server has that the rondo doesn't use
-		for name := range live {
-			if !usedTools[name] {
-				fmt.Fprintf(os.Stdout, "%s  %s\n", color.CyanString("+       "), name)
+		// new tools each server has that the rondo doesn't use
+		for key, serverLive := range live {
+			for name := range serverLive {
+				if !usedTools[key+"\x00"+name] {
+					fmt.Fprintf(os.Stdout, "%s  %s\n", color.CyanString("+       "), ref(key, name))
+				}
 			}
 		}
 
+		if undefinedRef {
+			return fmt.Errorf("rondo references a server not defined in the servers map")
+		}
 		if removed {
 			return fmt.Errorf("rondo uses tools that no longer exist on the server")
 		}

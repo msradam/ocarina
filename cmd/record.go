@@ -44,6 +44,7 @@ and writes a rondo when the session ends.`,
 		}
 
 		srv := exec.Command(serverCmd, serverArgs...) //#nosec G204 -- ocarina's purpose is launching user-specified MCP servers
+		srv.Env = os.Environ()
 		for k, v := range serverEnv {
 			srv.Env = append(srv.Env, k+"="+v)
 		}
