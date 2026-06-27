@@ -36,7 +36,7 @@ What you write is a playbook: a portable artifact that captures an automation wo
 go install github.com/msradam/ocarina@latest
 ```
 
-Binaries are available on the [releases page](https://github.com/msradam/ocarina/releases). Requires Go 1.22+.
+Binaries are available on the [releases page](https://github.com/msradam/ocarina/releases). Building from source requires Go 1.26+.
 
 ## Use
 
