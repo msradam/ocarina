@@ -281,12 +281,14 @@
       <a class="lk-nav-item" href="#install">Install</a>
       <a class="lk-nav-item" href="#rondo">Rondo format</a>
       <a class="lk-nav-item nav-sub-item" href="#multi-server">Multiple servers</a>
+      <a class="lk-nav-item nav-sub-item" href="#remote">Remote servers</a>
       <a class="lk-nav-item" href="#commands">Commands</a>
       <a class="lk-nav-item nav-sub-item" href="#docs">docs</a>
       <a class="lk-nav-item nav-sub-item" href="#record">record</a>
       <a class="lk-nav-item nav-sub-item" href="#play">play</a>
       <a class="lk-nav-item nav-sub-item" href="#validate">validate</a>
       <a class="lk-nav-item nav-sub-item" href="#diff">diff</a>
+      <a class="lk-nav-item nav-sub-item" href="#lock">lock</a>
       <a class="lk-nav-item nav-sub-item" href="#hum">hum</a>
       <a class="lk-nav-item" href="#examples">Examples</a>
       <a class="lk-nav-item" href="#showcases">Showcases</a>
@@ -556,6 +558,23 @@ rondo:
     tool: fetch
     args: {url: "https://example.com"}</code></pre>
       </div>
+
+      <h3 class="lk-h3" id="remote" style="margin:var(--space-6) 0 var(--space-3)">Remote servers</h3>
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">Give a server a <code class="lk-code-inline">url:</code> instead of a <code class="lk-code-inline">command:</code> to reach a hosted MCP server over the Streamable HTTP transport. Headers are sent on every request, so a bearer token works through <code class="lk-code-inline">{{env.X}}</code>. When a tool returns <code class="lk-code-inline">structuredContent</code>, <code class="lk-code-inline">grab</code> and <code class="lk-code-inline">expect</code> run against that typed JSON instead of the text block.</p>
+      <div class="code-wrap" style="margin-top:var(--space-3)">
+        <div class="code-label">remote.yaml</div>
+        <pre><code class="language-yaml">server:
+  url: https://api.githubcopilot.com/mcp/
+  headers:
+    Authorization: "Bearer {{env.GITHUB_TOKEN}}"
+
+rondo:
+  - name: who am I
+    tool: get_me
+    args: {}
+    expect:
+      contains: "login"</code></pre>
+      </div>
     </section>
 
     <!-- Commands -->
@@ -613,6 +632,8 @@ ocarina play examples/time-zones.yaml -e owner=acme --tags smoke</code></pre>
         <p style="color:var(--text-body);margin:var(--space-3) 0 var(--space-2);font-size:var(--type-sm)"><strong>Flags</strong></p>
         <table class="field-table" style="max-width:560px">
           <tbody>
+            <tr><td><code class="lk-code-inline">--output json</code></td><td>Emit a machine-readable pass/fail report on a clean stdout, for CI.</td></tr>
+            <tr><td><code class="lk-code-inline">--trace</code></td><td>Log every JSON-RPC frame to stderr.</td></tr>
             <tr><td><code class="lk-code-inline">--dry-run</code></td><td>Print steps without executing them.</td></tr>
             <tr><td><code class="lk-code-inline">-e key=value</code></td><td>Override a <code class="lk-code-inline">keys</code> variable at run time. Repeatable.</td></tr>
             <tr><td><code class="lk-code-inline">--tags</code> / <code class="lk-code-inline">--skip-tags</code></td><td>Run only, or skip, steps with the given tags.</td></tr>
@@ -639,6 +660,18 @@ ocarina play examples/time-zones.yaml -e owner=acme --tags smoke</code></pre>
         <div class="code-wrap">
           <div class="code-label">terminal</div>
           <pre><code class="language-bash">ocarina diff examples/github-investigation.yaml</code></pre>
+        </div>
+      </div>
+
+      <!-- lock -->
+      <div class="cmd-block" id="lock" style="margin-top:var(--space-6)">
+        <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">lock</p>
+        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina lock &lt;rondo.yaml&gt;</h3>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Snapshots each server's full tool schema, including tool descriptions, to a lock file. With <code class="lk-code-inline">--check</code>, compares the live server against the lock and exits non-zero if a tool was removed or its description or input schema changed. A reworded tool description is a breaking change for an agent and a possible tool-poisoning signal, so drift is a failure.</p>
+        <div class="code-wrap">
+          <div class="code-label">terminal</div>
+          <pre><code class="language-bash">ocarina lock audit.yaml           # write audit.yaml.lock
+ocarina lock audit.yaml --check   # fail if the live schema drifted</code></pre>
         </div>
       </div>
 

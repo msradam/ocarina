@@ -97,10 +97,12 @@ Ansible's inventory is external and static. Here the iteration space comes from 
 ocarina docs   <server...>                       # markdown docs from a live server
 ocarina record <out.yaml> <server...>            # proxy a session into a rondo
 ocarina play   <file.yaml>                        # execute a rondo
-ocarina play   <file.yaml> --dry-run
+ocarina play   <file.yaml> --output json          # machine-readable report for CI
+ocarina play   <file.yaml> --trace                # log every JSON-RPC frame to stderr
 ocarina play   <file.yaml> --tags smoke -e repo=acme
 ocarina validate <file.yaml>                     # static + live-schema checks, no tool calls
 ocarina diff   <file.yaml>                        # compare against current server schemas
+ocarina lock   <file.yaml>                        # snapshot the schema; --check fails on drift
 ocarina hum    <server...> -- <tool> [key=value] # ad-hoc single tool call
 ```
 
@@ -142,7 +144,7 @@ type Step struct {
 
 ### MCP client (`internal/mcpclient/`)
 
-A thin wrapper over the MCP wire protocol on stdio. It runs the `initialize` handshake, lists tools (following cursor pagination), calls tools, reads resources, and lists resources and resource templates. Ocarina declares no `sampling`, `elicitation`, or `roots` client capabilities, so a server cannot issue requests Ocarina cannot service.
+A thin wrapper over the MCP wire protocol. A server runs over stdio (a local subprocess) or the Streamable HTTP transport (a remote `url:`, with `headers:` such as a bearer token sent on every request). It runs the `initialize` handshake, lists tools (draining the paginated iterator), calls tools, reads resources, and lists resources and resource templates. Ocarina declares no `sampling`, `elicitation`, or `roots` client capabilities, so a server cannot issue requests Ocarina cannot service.
 
 ### Executor (`cmd/play.go`)
 

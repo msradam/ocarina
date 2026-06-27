@@ -135,13 +135,37 @@ rondo:
 
 Output and `diff` namespace tool names by server (`time.get_current_time`). The single `server:` block still works for one-server rondos.
 
+## Remote servers
+
+Give a server a `url:` instead of a `command:` to use the Streamable HTTP transport instead of a local subprocess. Headers are sent on every request, so a bearer token works through `{{env.X}}`:
+
+```yaml
+server:
+  url: https://api.githubcopilot.com/mcp/
+  headers:
+    Authorization: "Bearer {{env.GITHUB_TOKEN}}"
+
+rondo:
+  - name: who am I
+    tool: get_me
+    args: {}
+    expect:
+      contains: "login"
+```
+
+This reaches hosted MCP servers the same way it drives local ones. When a tool returns `structuredContent`, `grab` and `expect` run against that typed JSON instead of parsing the text block.
+
 ## Commands
 
 **`ocarina docs <command> [args...]`**: generate markdown documentation for every tool, resource, and resource template a server exposes.
 
-**`ocarina play <rondo.yaml>`**: execute each step against the live server.
+**`ocarina play <rondo.yaml>`**: execute each step against the live server. Flags: `--output json` for a machine-readable report, `--trace` to log every JSON-RPC frame, `--dry-run`, `-e key=value`, `--tags`/`--skip-tags`.
 
 **`ocarina validate <rondo.yaml>`**: check tool names, required args, schema types, and `{{key}}` data flow without making any calls.
+
+**`ocarina diff <rondo.yaml>`**: compare the rondo's tools against the server's current schemas.
+
+**`ocarina lock <rondo.yaml>`**: snapshot the full tool schema to a lock file. `--check` compares the live server against it and fails on drift, including a reworded tool description.
 
 **`ocarina hum <command> [args...] -- <tool> [key=value ...]`**: call a single tool and print the result.
 
