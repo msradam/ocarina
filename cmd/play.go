@@ -16,7 +16,7 @@ import (
 	"github.com/msradam/ocarina/internal/condition"
 	"github.com/msradam/ocarina/internal/interp"
 	"github.com/msradam/ocarina/internal/mcpclient"
-	"github.com/msradam/ocarina/internal/playbook"
+	"github.com/msradam/ocarina/internal/rondo"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +42,7 @@ Example:
   ocarina play audit.yaml --dry-run`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := playbook.Load(args[0])
+		c, err := rondo.Load(args[0])
 		if err != nil {
 			return fmt.Errorf("load rondo: %w", err)
 		}
@@ -78,7 +78,7 @@ Example:
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		var failures []string
 
-		for i, step := range c.Rondo {
+		for i, step := range c.Steps {
 			name := step.Name
 			if name == "" {
 				name = fmt.Sprintf("step %d", i+1)
@@ -201,7 +201,7 @@ Example:
 
 // runWithRetry wraps dispatchStep with Ansible-faithful retry/until semantics.
 // When retry: is nil, it delegates directly with no overhead.
-func runWithRetry(ctx context.Context, sess *mcp.ClientSession, step playbook.Step, notes map[string]string) (string, bool, error) {
+func runWithRetry(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, notes map[string]string) (string, bool, error) {
 	r := step.Retry
 	if r == nil {
 		return dispatchStep(ctx, sess, step, notes)
@@ -261,7 +261,7 @@ func runWithRetry(ctx context.Context, sess *mcp.ClientSession, step playbook.St
 }
 
 // isToolError is true when the server returned isError:true on a tool call.
-func dispatchStep(ctx context.Context, sess *mcp.ClientSession, step playbook.Step, notes map[string]string) (output string, isToolError bool, err error) {
+func dispatchStep(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, notes map[string]string) (output string, isToolError bool, err error) {
 	switch {
 	case step.Tool != "":
 		return callTool(ctx, sess, step, notes)
@@ -274,7 +274,7 @@ func dispatchStep(ctx context.Context, sess *mcp.ClientSession, step playbook.St
 	}
 }
 
-func callTool(ctx context.Context, sess *mcp.ClientSession, step playbook.Step, notes map[string]string) (string, bool, error) {
+func callTool(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, notes map[string]string) (string, bool, error) {
 	var callArgs map[string]any
 	if step.Args != nil {
 		callArgs, _ = interp.Apply(step.Args, notes).(map[string]any)
@@ -313,7 +313,7 @@ func callTool(ctx context.Context, sess *mcp.ClientSession, step playbook.Step, 
 	return strings.Join(parts, "\n"), result.IsError, nil
 }
 
-func readResource(ctx context.Context, sess *mcp.ClientSession, step playbook.Step, notes map[string]string) (string, bool, error) {
+func readResource(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, notes map[string]string) (string, bool, error) {
 	uri := interp.Apply(step.Resource, notes).(string)
 	result, err := sess.ReadResource(ctx, &mcp.ReadResourceParams{URI: uri})
 	if err != nil {
@@ -330,7 +330,7 @@ func readResource(ctx context.Context, sess *mcp.ClientSession, step playbook.St
 	return strings.Join(parts, "\n"), false, nil
 }
 
-func listResources(ctx context.Context, sess *mcp.ClientSession, _ playbook.Step, _ map[string]string) (string, bool, error) {
+func listResources(ctx context.Context, sess *mcp.ClientSession, _ rondo.Step, _ map[string]string) (string, bool, error) {
 	res, err := sess.ListResources(ctx, nil)
 	if err != nil {
 		return "", false, err
@@ -379,7 +379,7 @@ func resolveLoop(loop string, notes map[string]string) ([]string, error) {
 	return items, nil
 }
 
-func checkExpect(e *playbook.Expect, output string, isToolError bool, notes map[string]string) string {
+func checkExpect(e *rondo.Expect, output string, isToolError bool, notes map[string]string) string {
 	if e.Contains != "" {
 		want := interp.Apply(e.Contains, notes).(string)
 		if !strings.Contains(output, want) {
@@ -428,7 +428,7 @@ func checkExpect(e *playbook.Expect, output string, isToolError bool, notes map[
 	return ""
 }
 
-func stepLabel(t playbook.Step) string {
+func stepLabel(t rondo.Step) string {
 	switch {
 	case t.Tool != "":
 		return t.Tool
@@ -443,7 +443,7 @@ func stepLabel(t playbook.Step) string {
 	}
 }
 
-func dryRunDetail(t playbook.Step, notes map[string]string) string {
+func dryRunDetail(t rondo.Step, notes map[string]string) string {
 	switch {
 	case t.Tool != "":
 		return fmt.Sprintf("tool=%s args=%v", t.Tool, t.Args)

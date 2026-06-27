@@ -12,7 +12,7 @@ import (
 	"github.com/msradam/ocarina/internal/condition"
 	"github.com/msradam/ocarina/internal/interp"
 	"github.com/msradam/ocarina/internal/mcpclient"
-	"github.com/msradam/ocarina/internal/playbook"
+	"github.com/msradam/ocarina/internal/rondo"
 	"github.com/spf13/cobra"
 )
 
@@ -25,8 +25,8 @@ var (
 )
 
 var validateCmd = &cobra.Command{
-	Use:   "validate <cassette.yaml>",
-	Short: "Validate a cassette against the server's tool schemas without running any tools",
+	Use:   "validate <rondo.yaml>",
+	Short: "Validate a rondo against the server's tool schemas without running any tools",
 	Long: `Connects to the server, fetches tool schemas, and checks every step for:
   - tool exists on the server
   - required args are present
@@ -40,7 +40,7 @@ Example:
   ocarina validate examples/github-investigation.yaml`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		c, err := playbook.Load(args[0])
+		c, err := rondo.Load(args[0])
 		if err != nil {
 			return fmt.Errorf("load: %w", err)
 		}
@@ -97,7 +97,7 @@ Example:
 
 		var totalErrs, totalWarns int
 
-		for i, step := range c.Rondo {
+		for i, step := range c.Steps {
 			name := step.Name
 			if name == "" {
 				name = fmt.Sprintf("step %d", i+1)
@@ -214,7 +214,7 @@ Example:
 
 		fmt.Fprintln(os.Stdout)
 		if totalErrs == 0 && totalWarns == 0 {
-			fmt.Fprintf(os.Stdout, "%s\n", color.GreenString("all %d step(s) valid", len(c.Rondo)))
+			fmt.Fprintf(os.Stdout, "%s\n", color.GreenString("all %d step(s) valid", len(c.Steps)))
 			return nil
 		}
 		fmt.Fprintf(os.Stdout, "%s\n", color.RedString("%d error(s)", totalErrs)+color.YellowString(", %d warning(s)", totalWarns))

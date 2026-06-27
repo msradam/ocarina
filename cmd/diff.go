@@ -1,55 +1,141 @@
 package cmd
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
-	"github.com/gonvenience/ytbx"
-	"github.com/homeport/dyff/pkg/dyff"
+	"github.com/fatih/color"
+	"github.com/msradam/ocarina/internal/interp"
+	"github.com/msradam/ocarina/internal/mcpclient"
+	"github.com/msradam/ocarina/internal/rondo"
 	"github.com/spf13/cobra"
 )
 
 var diffCmd = &cobra.Command{
-	Use:   "diff <cassette-a.yaml> <cassette-b.yaml>",
-	Short: "Show semantic diff between two cassettes",
-	Long: `Compares two cassette files and shows what changed: tracks added or removed,
-args that differ, expect assertions that changed, and result blocks that shifted.
+	Use:   "diff <rondo.yaml>",
+	Short: "Compare a rondo against the live server's current tool schemas",
+	Long: `Connects to the server declared in the rondo and compares every tool step
+against the server's current schemas. Shows tools that were removed, args that
+became required, and new tools the server now offers that the rondo doesn't use.
 
-Useful for comparing a cassette recorded against v1 of a server with one
-recorded against v2, or for reviewing changes to a hand-edited cassette.
+Exits non-zero if any tools used by the rondo no longer exist on the server.
 
 Example:
-  ocarina diff examples/time-zones.yaml examples/time-zones-updated.yaml
-  ocarina diff cassette-v1.yaml cassette-v2.yaml`,
-	Args: cobra.ExactArgs(2),
+  ocarina diff examples/github-investigation.yaml
+  ocarina diff session.yaml`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		from, to, err := ytbx.LoadFiles(args[0], args[1])
+		r, err := rondo.Load(args[0])
 		if err != nil {
-			return fmt.Errorf("load: %w", err)
+			return fmt.Errorf("load rondo: %w", err)
 		}
 
-		report, err := dyff.CompareInputFiles(from, to,
-			dyff.IgnoreOrderChanges(false),
-			dyff.AdditionalIdentifiers("name", "tool"),
-		)
+		ctx := context.Background()
+		if err := resolveServer(&r.Server); err != nil {
+			return err
+		}
+		serverArgs := interp.Strings(r.Server.Args, r.Keys)
+		serverEnv := interp.StringMap(r.Server.Env, r.Keys)
+		sess, err := mcpclient.Connect(ctx, r.Server.Command, serverArgs, serverEnv)
 		if err != nil {
-			return fmt.Errorf("compare: %w", err)
+			return fmt.Errorf("connect: %w", err)
+		}
+		defer sess.Close()
+
+		res, err := sess.ListTools(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("list tools: %w", err)
 		}
 
-		if len(report.Diffs) == 0 {
-			fmt.Fprintln(os.Stdout, "no differences")
-			return nil
+		type liveTool struct {
+			required   map[string]bool
+			properties map[string]bool
+		}
+		live := make(map[string]liveTool, len(res.Tools))
+		for _, t := range res.Tools {
+			lt := liveTool{
+				required:   make(map[string]bool),
+				properties: make(map[string]bool),
+			}
+			if t.InputSchema != nil {
+				raw, _ := json.Marshal(t.InputSchema)
+				var s struct {
+					Required   []string       `json:"required"`
+					Properties map[string]any `json:"properties"`
+				}
+				if json.Unmarshal(raw, &s) == nil {
+					for _, req := range s.Required {
+						lt.required[req] = true
+					}
+					for k := range s.Properties {
+						lt.properties[k] = true
+					}
+				}
+			}
+			live[t.Name] = lt
 		}
 
-		hr := &dyff.HumanReport{
-			Report:               report,
-			DoNotInspectCerts:    true,
-			NoTableStyle:         false,
-			OmitHeader:           true,
-			UseGoPatchPaths:      false,
-			MinorChangeThreshold: 0.1,
+		// collect tools used by the rondo
+		usedTools := make(map[string]bool)
+		for _, step := range r.Steps {
+			if step.Tool != "" {
+				usedTools[step.Tool] = true
+			}
 		}
-		return hr.WriteReport(os.Stdout)
+
+		removed := false
+		printed := make(map[string]bool)
+
+		for _, step := range r.Steps {
+			if step.Tool == "" {
+				continue
+			}
+			if printed[step.Tool] {
+				continue
+			}
+			printed[step.Tool] = true
+
+			lt, found := live[step.Tool]
+			if !found {
+				fmt.Fprintf(os.Stdout, "%s  %s\n", color.RedString("REMOVED "), step.Tool)
+				removed = true
+				continue
+			}
+
+			var issues []string
+			for req := range lt.required {
+				if _, ok := step.Args[req]; !ok {
+					issues = append(issues, fmt.Sprintf("arg %q now required", req))
+				}
+			}
+			for arg := range step.Args {
+				if len(lt.properties) > 0 && !lt.properties[arg] {
+					issues = append(issues, fmt.Sprintf("arg %q not in schema", arg))
+				}
+			}
+
+			if len(issues) == 0 {
+				fmt.Fprintf(os.Stdout, "%s  %s\n", color.GreenString("OK      "), step.Tool)
+			} else {
+				for _, iss := range issues {
+					fmt.Fprintf(os.Stdout, "%s  %s: %s\n", color.YellowString("WARN    "), step.Tool, iss)
+				}
+			}
+		}
+
+		// new tools the server has that the rondo doesn't use
+		for name := range live {
+			if !usedTools[name] {
+				fmt.Fprintf(os.Stdout, "%s  %s\n", color.CyanString("+       "), name)
+			}
+		}
+
+		if removed {
+			return fmt.Errorf("rondo uses tools that no longer exist on the server")
+		}
+		return nil
 	},
 }
 

@@ -8,25 +8,25 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/msradam/ocarina/internal/playbook"
 	"github.com/msradam/ocarina/internal/proxy"
+	"github.com/msradam/ocarina/internal/rondo"
 	"github.com/spf13/cobra"
 )
 
 var recordCmd = &cobra.Command{
 	Use:   "record <output.yaml> <command> [args...]",
-	Short: "Proxy an MCP server and record tool calls to a cassette",
+	Short: "Proxy an MCP server and record tool calls to a rondo",
 	Long: `Sits transparently between an MCP host and server over stdio.
 Every tools/call request and its response is recorded into output.yaml.
 sampling/createMessage exchanges (LLM reasoning inside agentic servers) are
-captured in the cassette's llm: block.
+captured in the rondo's llm: block.
 
 Configure your MCP host to run:
   ocarina record session.yaml uvx mcp-server-fetch
   ocarina record session.yaml uvx mcp-server-sqlite --db-path /tmp/db.sqlite
 
 instead of running the server directly. ocarina forwards all traffic
-and writes a cassette when the session ends.`,
+and writes a rondo when the session ends.`,
 	Args: cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		output := args[0]
@@ -106,8 +106,8 @@ and writes a cassette when the session ends.`,
 			return nil
 		}
 
-		c := &playbook.Cassette{
-			Server: playbook.Server{Command: serverCmd, Args: serverArgs},
+		r := &rondo.File{
+			Server: rondo.Server{Command: serverCmd, Args: serverArgs},
 		}
 		noResult, _ := cmd.Flags().GetBool("no-result")
 		toolIdx := map[string]int{}
@@ -121,7 +121,7 @@ and writes a cassette when the session ends.`,
 			if toolCount[rc.Tool] > 1 {
 				name = fmt.Sprintf("%s_%d", rc.Tool, toolIdx[rc.Tool])
 			}
-			step := playbook.Step{
+			step := rondo.Step{
 				Name: name,
 				Tool: rc.Tool,
 				Args: rc.Args,
@@ -135,33 +135,33 @@ and writes a cassette when the session ends.`,
 				}
 				if err := json.Unmarshal(rc.Result, &result); err == nil {
 					for _, item := range result.Content {
-						step.Result = append(step.Result, playbook.ResultItem{
+						step.Result = append(step.Result, rondo.ResultItem{
 							Type: item.Type,
 							Text: item.Text,
 						})
 					}
 				}
 			}
-			c.Rondo = append(c.Rondo, step)
+			r.Steps = append(r.Steps, step)
 		}
 
 		for _, sc := range sampled {
-			c.LLM = append(c.LLM, parseSampledCall(sc))
+			r.LLM = append(r.LLM, parseSampledCall(sc))
 		}
 
-		if err := playbook.Save(output, c); err != nil {
-			return fmt.Errorf("save cassette: %w", err)
+		if err := rondo.Save(output, r); err != nil {
+			return fmt.Errorf("save rondo: %w", err)
 		}
-		msg := fmt.Sprintf("ocarina: recorded %d step(s)", len(c.Rondo))
-		if len(c.LLM) > 0 {
-			msg += fmt.Sprintf(", %d llm round(s)", len(c.LLM))
+		msg := fmt.Sprintf("ocarina: recorded %d step(s)", len(r.Steps))
+		if len(r.LLM) > 0 {
+			msg += fmt.Sprintf(", %d llm round(s)", len(r.LLM))
 		}
 		fmt.Fprintf(os.Stderr, "%s to %s\n", msg, output)
 		return nil
 	},
 }
 
-func parseSampledCall(sc proxy.SampledCall) playbook.LLMRound {
+func parseSampledCall(sc proxy.SampledCall) rondo.LLMRound {
 	var params struct {
 		SystemPrompt string `json:"systemPrompt"`
 		Messages     []struct {
@@ -189,7 +189,7 @@ func parseSampledCall(sc proxy.SampledCall) playbook.LLMRound {
 	for _, m := range params.Messages {
 		parts = append(parts, "["+m.Role+"] "+m.Content.Text)
 	}
-	return playbook.LLMRound{
+	return rondo.LLMRound{
 		Prompt:   strings.Join(parts, "\n"),
 		Response: result.Content.Text,
 		Model:    result.Model,
@@ -198,6 +198,6 @@ func parseSampledCall(sc proxy.SampledCall) playbook.LLMRound {
 
 func init() {
 	recordCmd.Flags().SetInterspersed(false)
-	recordCmd.Flags().Bool("no-result", false, "omit result blocks from the cassette (smaller files, cleaner diffs)")
+	recordCmd.Flags().Bool("no-result", false, "omit result blocks from the rondo (smaller files, cleaner diffs)")
 	rootCmd.AddCommand(recordCmd)
 }

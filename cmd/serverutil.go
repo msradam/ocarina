@@ -3,13 +3,13 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/msradam/ocarina/internal/playbook"
+	"github.com/msradam/ocarina/internal/rondo"
 	"github.com/msradam/ocarina/internal/servers"
 )
 
 // resolveServer fills in Command/Args/Env on s when s.Name is set.
 // Returns an error if the name is not found in any mcp.json.
-func resolveServer(s *playbook.Server) error {
+func resolveServer(s *rondo.Server) error {
 	if s.Name == "" {
 		return nil
 	}

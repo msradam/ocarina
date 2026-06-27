@@ -1,4 +1,4 @@
-package playbook
+package rondo
 
 import (
 	"fmt"
@@ -7,10 +7,10 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-type Cassette struct {
+type File struct {
 	Keys   map[string]string `yaml:"keys,omitempty"`
 	Server Server            `yaml:"server"`
-	Rondo  []Step            `yaml:"rondo"`
+	Steps  []Step            `yaml:"rondo"`
 	LLM    []LLMRound        `yaml:"llm,omitempty"`
 }
 
@@ -86,20 +86,20 @@ type ResultItem struct {
 	Text string `yaml:"text,omitempty"`
 }
 
-func Load(path string) (*Cassette, error) {
+func Load(path string) (*File, error) {
 	data, err := os.ReadFile(path) //#nosec G304 -- caller-supplied path is the point of this CLI tool
 	if err != nil {
 		return nil, err
 	}
-	var c Cassette
-	if err := yaml.Unmarshal(data, &c); err != nil {
+	var f File
+	if err := yaml.Unmarshal(data, &f); err != nil {
 		return nil, fmt.Errorf("%w\n%s", err, yaml.FormatError(err, true, true))
 	}
-	return &c, nil
+	return &f, nil
 }
 
-func Save(path string, c *Cassette) error {
-	data, err := yaml.Marshal(c)
+func Save(path string, f *File) error {
+	data, err := yaml.Marshal(f)
 	if err != nil {
 		return err
 	}
