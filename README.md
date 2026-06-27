@@ -194,6 +194,15 @@ Working rondos for 50+ MCP servers are in [`examples/`](examples/). A selection:
 
 See [docs/tested-servers.md](docs/tested-servers.md) for the full list.
 
+## Showcases
+
+Standalone repositories you can clone and run, each a real working environment for a different MCP server:
+
+- [duckdb-mcp-ocarina](https://github.com/msradam/duckdb-mcp-ocarina): data integrity, migration, and regression tests against a DuckDB database. Clone and run, no credentials.
+- [chrome-devtools-mcp-ocarina](https://github.com/msradam/chrome-devtools-mcp-ocarina): synthetic web health checks through Google's Chrome DevTools MCP. Fail on a console error or a failed request.
+- [github-mcp-ocarina](https://github.com/msradam/github-mcp-ocarina): repo governance as tests through the GitHub MCP server. Assert a repo ships a license, is documented, and has history.
+- [blender-mcp-ocarina](https://github.com/msradam/blender-mcp-ocarina): automate and snapshot-test a 3D scene in Blender, an app with no external API at all.
+
 ## Use in CI
 
 `play` exits 0 if all `expect:` assertions pass, non-zero otherwise. Drop a rondo into any CI pipeline:
