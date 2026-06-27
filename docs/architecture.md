@@ -142,7 +142,7 @@ type Step struct {
 
 ### MCP client (`internal/mcpclient/`)
 
-A thin wrapper over the MCP wire protocol on stdio. It runs the `initialize` handshake, lists tools (following cursor pagination), calls tools, reads resources, and lists resources and resource templates. Ocarina declares no `sampling`, `elicitation`, or `roots` client capabilities, so a server cannot issue requests Ocarina is unable to service.
+A thin wrapper over the MCP wire protocol on stdio. It runs the `initialize` handshake, lists tools (following cursor pagination), calls tools, reads resources, and lists resources and resource templates. Ocarina declares no `sampling`, `elicitation`, or `roots` client capabilities, so a server cannot issue requests Ocarina cannot service.
 
 ### Executor (`cmd/play.go`)
 

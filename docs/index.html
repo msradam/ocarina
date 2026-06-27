@@ -147,7 +147,7 @@
       overflow-x: auto;
     }
 
-    /* hljs tokens via Lokta semantic vars — adapts with theme */
+    /* hljs tokens via Lokta semantic vars, adapts with theme */
     .hljs { background: transparent !important; padding: 0 !important; color: var(--text-body) !important; }
     .hljs-attr { color: var(--viz-1) !important; }
     .hljs-string { color: var(--pigment-malachite, #3F6B4E) !important; }
@@ -245,7 +245,7 @@
 
     <a class="sidebar-brand" href="#top">
       <svg class="sidebar-brand-icon" viewBox="0 0 200 200" aria-hidden="true">
-        <!-- whistle icon — Alessio Capponi / Noun Project CC BY 3.0 -->
+        <!-- whistle icon by Alessio Capponi / Noun Project CC BY 3.0 -->
         <polygon points="135.5 47 144.25 47 153 47 153 38 144.25 38 135.5 38 126.75 38 118 38 118 47 126.75 47 135.5 47" fill="currentColor"/>
         <polygon points="108.33 56 117 56 117 47 108.33 47 99.67 47 91 47 91 56 99.67 56 108.33 56" fill="currentColor"/>
         <polygon points="82 74 91 74 91 65 91 56 82 56 73 56 73 65 82 65 82 74" fill="currentColor"/>
@@ -737,7 +737,7 @@ jobs:
 
       <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed);margin-top:var(--space-4)">Errors are uneven for the same reason. The spec lets a tool flag a failure with <code class="lk-code-inline">isError</code>, but plenty of servers report trouble as ordinary text and never set it. Ocarina catches a misspelled tool name or a missing required argument by checking the live schema before it calls, so those fail loudly. A server that returns <span style="font-style:italic">table not found</span> as a cheerful string is harder to catch on its own, and that is what an <code class="lk-code-inline">expect:</code> assertion is for.</p>
 
-      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed);margin-top:var(--space-4)">So the honest scope. Ocarina is an automation framework for the MCP servers that behave like clean RPC, and a deterministic test harness for the ones that do not. Today that means smoke tests in CI and scripts that chain a few well-behaved servers together. Recording a session and replaying it without a model works now too. The reach grows as the ecosystem matures and servers return more structure. The Blender demo on the home page is the far end of what is already possible. The rough edges above are the near end you will actually hit.</p>
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed);margin-top:var(--space-4)">So the honest scope. Ocarina is an automation framework for the MCP servers that behave like clean RPC, and a deterministic test harness for the ones that do not. Today that means smoke tests in CI and scripts that chain a few well-behaved servers. Recording a session and replaying it without a model works now too. The reach grows as the ecosystem matures and servers return more structure. The Blender demo on the home page is the far end of what is already possible. The rough edges above are the near end you will actually hit.</p>
 
       <h3 class="lk-h3" style="margin:var(--space-6) 0 var(--space-3)">What Ocarina is not</h3>
       <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">It does not score LLM outputs, compare models, or track token costs. It connects to the real server on every <code class="lk-code-inline">play</code> run, so a broken server breaks the replay. It runs one linear pass with no scheduler and no state carried between runs. The output is stdout and an exit code.</p>
