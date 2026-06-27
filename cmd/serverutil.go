@@ -45,6 +45,19 @@ func resolveServer(s *rondo.Server) error {
 	return nil
 }
 
+// listAllTools drains the paginated Tools iterator so large servers are not
+// truncated at the first page.
+func listAllTools(ctx context.Context, sess *mcp.ClientSession) ([]*mcp.Tool, error) {
+	var tools []*mcp.Tool
+	for t, err := range sess.Tools(ctx, nil) {
+		if err != nil {
+			return nil, err
+		}
+		tools = append(tools, t)
+	}
+	return tools, nil
+}
+
 // referencedServerKeys returns the set of server keys that action steps target,
 // so validate/diff connect only to servers the rondo actually uses (matching
 // play's lazy connect). Undefined references are reported per-step, not here.

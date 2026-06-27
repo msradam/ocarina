@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"sort"
@@ -15,6 +16,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/msradam/ocarina/internal/condition"
 	"github.com/msradam/ocarina/internal/interp"
+	"github.com/msradam/ocarina/internal/mcpclient"
 	"github.com/msradam/ocarina/internal/rondo"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +27,10 @@ var (
 	red        = color.New(color.FgRed).SprintfFunc()
 	yellowPlay = color.New(color.FgYellow).SprintfFunc()
 )
+
+// stdout receives the human progress output. --output json points it at
+// io.Discard so stdout carries only the machine-readable report.
+var stdout io.Writer = os.Stdout
 
 var playCmd = &cobra.Command{
 	Use:   "play <rondo.yaml>",
@@ -88,9 +94,9 @@ Example:
 				return nil, fmt.Errorf("connect %q: %w", key, err)
 			}
 			sessions[key] = s
-			if res, lerr := s.ListTools(ctx, nil); lerr == nil {
-				tools := make(map[string][]string, len(res.Tools))
-				for _, t := range res.Tools {
+			if toolsList, lerr := listAllTools(ctx, s); lerr == nil {
+				tools := make(map[string][]string, len(toolsList))
+				for _, t := range toolsList {
 					var req []string
 					if t.InputSchema != nil {
 						raw, _ := json.Marshal(t.InputSchema)
@@ -108,6 +114,14 @@ Example:
 		}
 
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		outputJSON := false
+		if o, _ := cmd.Flags().GetString("output"); o == "json" {
+			outputJSON = true
+			stdout = io.Discard
+		}
+		if t, _ := cmd.Flags().GetBool("trace"); t {
+			mcpclient.TraceWriter = os.Stderr
+		}
 		var failures []string
 
 		for i, step := range c.Steps {
@@ -123,7 +137,7 @@ Example:
 			items, err := resolveLoop(step.Loop, notes)
 			if err != nil {
 				if step.IgnoreErrors {
-					fmt.Fprintf(os.Stdout, "%s %s\n    %s %v\n\n", boldCyan("==>"), name, red("error:"), err)
+					fmt.Fprintf(stdout, "%s %s\n    %s %v\n\n", boldCyan("==>"), name, red("error:"), err)
 					continue
 				}
 				fmt.Fprintf(os.Stderr, "%s %s\n    %s %v\n\n", boldCyan("==>"), name, red("error:"), err)
@@ -157,7 +171,7 @@ Example:
 				if item != "" {
 					label += fmt.Sprintf(" [%s]", truncate(item, 40))
 				}
-				fmt.Fprintf(os.Stdout, "%s %s\n", boldCyan("==>"), fmt.Sprintf("%s (%s)", name, label))
+				fmt.Fprintf(stdout, "%s %s\n", boldCyan("==>"), fmt.Sprintf("%s (%s)", name, label))
 
 				if step.When != "" {
 					ok, evalErr := condition.EvalBool(step.When, iterNotes, "")
@@ -167,13 +181,13 @@ Example:
 						continue
 					}
 					if !ok {
-						fmt.Fprintf(os.Stdout, "    %s\n\n", yellowPlay("skipped"))
+						fmt.Fprintf(stdout, "    %s\n\n", yellowPlay("skipped"))
 						continue
 					}
 				}
 
 				if dryRun {
-					fmt.Fprintf(os.Stdout, "    [dry-run] %s\n\n", dryRunDetail(step, iterNotes))
+					fmt.Fprintf(stdout, "    [dry-run] %s\n\n", dryRunDetail(step, iterNotes))
 					continue
 				}
 
@@ -219,7 +233,7 @@ Example:
 							cancelFn()
 						}
 						if step.IgnoreErrors {
-							fmt.Fprintf(os.Stdout, "    %s %s\n\n", red("error:"), schemaErr)
+							fmt.Fprintf(stdout, "    %s %s\n\n", red("error:"), schemaErr)
 							continue
 						}
 						fmt.Fprintf(os.Stderr, "    %s %s\n\n", red("error:"), schemaErr)
@@ -235,7 +249,7 @@ Example:
 				if dispatchErr != nil {
 					msg := fmt.Sprintf("    %s %v\n\n", red("error:"), dispatchErr)
 					if step.IgnoreErrors {
-						fmt.Fprint(os.Stdout, msg)
+						fmt.Fprint(stdout, msg)
 						continue
 					}
 					fmt.Fprint(os.Stderr, msg)
@@ -273,7 +287,7 @@ Example:
 				if step.Grab != "" {
 					displayed = captured
 				}
-				fmt.Fprintf(os.Stdout, "%s\n", colorOutput(displayed))
+				fmt.Fprintf(stdout, "%s\n", colorOutput(displayed))
 
 				if step.Echo != "" {
 					notes[step.Echo] = captured
@@ -289,10 +303,17 @@ Example:
 					}
 				}
 
-				fmt.Fprintln(os.Stdout)
+				fmt.Fprintln(stdout)
 			}
 		}
 
+		if outputJSON {
+			_ = json.NewEncoder(os.Stdout).Encode(map[string]any{
+				"ok":       len(failures) == 0,
+				"failed":   len(failures),
+				"failures": failures,
+			})
+		}
 		if len(failures) > 0 {
 			return fmt.Errorf("%d step(s) failed", len(failures))
 		}
@@ -499,14 +520,14 @@ func checkExpect(e *rondo.Expect, output string, isToolError bool, notes map[str
 		if !strings.Contains(output, want) {
 			return fmt.Sprintf("expected output to contain %q", want)
 		}
-		fmt.Fprintf(os.Stdout, "    %s contains %q\n", green("PASS:"), want)
+		fmt.Fprintf(stdout, "    %s contains %q\n", green("PASS:"), want)
 	}
 	if e.Equals != "" {
 		want := interp.Apply(e.Equals, notes).(string)
 		if strings.TrimSpace(output) != strings.TrimSpace(want) {
 			return fmt.Sprintf("expected output to equal %q", want)
 		}
-		fmt.Fprintf(os.Stdout, "    %s equals %q\n", green("PASS:"), want)
+		fmt.Fprintf(stdout, "    %s equals %q\n", green("PASS:"), want)
 	}
 	if e.Matches != "" {
 		pattern := interp.Apply(e.Matches, notes).(string)
@@ -517,13 +538,13 @@ func checkExpect(e *rondo.Expect, output string, isToolError bool, notes map[str
 		if !re.MatchString(output) {
 			return fmt.Sprintf("expected output to match %q", pattern)
 		}
-		fmt.Fprintf(os.Stdout, "    %s matches %q\n", green("PASS:"), pattern)
+		fmt.Fprintf(stdout, "    %s matches %q\n", green("PASS:"), pattern)
 	}
 	if e.IsError != nil {
 		if isToolError != *e.IsError {
 			return fmt.Sprintf("expected is_error=%v, got %v", *e.IsError, isToolError)
 		}
-		fmt.Fprintf(os.Stdout, "    %s is_error=%v\n", green("PASS:"), *e.IsError)
+		fmt.Fprintf(stdout, "    %s is_error=%v\n", green("PASS:"), *e.IsError)
 	}
 	if e.Rule != "" {
 		passed, evalErr := condition.EvalBool(e.Rule, notes, output)
@@ -537,7 +558,7 @@ func checkExpect(e *rondo.Expect, output string, isToolError bool, notes map[str
 			}
 			return msg
 		}
-		fmt.Fprintf(os.Stdout, "    %s rule %q\n", green("PASS:"), e.Rule)
+		fmt.Fprintf(stdout, "    %s rule %q\n", green("PASS:"), e.Rule)
 	}
 	return ""
 }
@@ -694,6 +715,8 @@ func renderColor(v any, indent string) string {
 
 func init() {
 	playCmd.Flags().Bool("dry-run", false, "print steps without executing them")
+	playCmd.Flags().String("output", "text", "output format: text or json")
+	playCmd.Flags().Bool("trace", false, "log every JSON-RPC frame to stderr")
 	playCmd.Flags().StringArrayP("extra-vars", "e", nil, "override keys: variables (key=value, repeatable)")
 	playCmd.Flags().StringArray("tags", nil, "run only steps with these tags (repeatable)")
 	playCmd.Flags().StringArray("skip-tags", nil, "skip steps with these tags (repeatable)")

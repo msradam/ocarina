@@ -52,13 +52,13 @@ Example:
 			}
 			defer sess.Close()
 
-			res, err := sess.ListTools(ctx, nil)
+			toolsList, err := listAllTools(ctx, sess)
 			if err != nil {
 				return fmt.Errorf("list tools (%s): %w", key, err)
 			}
 
-			live[key] = make(map[string]liveTool, len(res.Tools))
-			for _, t := range res.Tools {
+			live[key] = make(map[string]liveTool, len(toolsList))
+			for _, t := range toolsList {
 				lt := liveTool{
 					required:   make(map[string]bool),
 					properties: make(map[string]bool),

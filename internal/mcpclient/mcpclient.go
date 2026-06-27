@@ -3,6 +3,7 @@ package mcpclient
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -10,8 +11,19 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// TraceWriter, when set, logs every JSON-RPC frame to it (the --trace flag).
+var TraceWriter io.Writer
+
 func newClient() *mcp.Client {
 	return mcp.NewClient(&mcp.Implementation{Name: "ocarina", Version: "0.2.0"}, nil)
+}
+
+// trace wraps a transport in a frame logger when --trace is on.
+func trace(t mcp.Transport) mcp.Transport {
+	if TraceWriter != nil {
+		return &mcp.LoggingTransport{Transport: t, Writer: TraceWriter}
+	}
+	return t
 }
 
 // Connect starts a local MCP server over stdio. env is merged on top of the
@@ -24,7 +36,7 @@ func Connect(ctx context.Context, command string, args []string, env map[string]
 			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 		}
 	}
-	return newClient().Connect(ctx, &mcp.CommandTransport{Command: cmd}, nil)
+	return newClient().Connect(ctx, trace(&mcp.CommandTransport{Command: cmd}), nil)
 }
 
 // ConnectHTTP connects to a remote MCP server over the Streamable HTTP
@@ -38,7 +50,7 @@ func ConnectHTTP(ctx context.Context, url string, headers map[string]string) (*m
 		// persistent server-initiated stream.
 		DisableStandaloneSSE: true,
 	}
-	return newClient().Connect(ctx, t, nil)
+	return newClient().Connect(ctx, trace(t), nil)
 }
 
 // headerTransport adds fixed headers to every request.
