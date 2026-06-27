@@ -3,31 +3,21 @@
 Ocarina is a YAML-driven automation framework for MCP servers. It sits in the same place relative to MCP that Ansible sits relative to SSH: an LLM-free execution engine that composes protocol primitives into repeatable workflows.
 
 ```
-┌─────────────────────────────────────────────┐
-│                  rondo.yaml                  │  authored by a human or an agent
-│  keys / servers / rondo: [steps...]          │
-└────────────────┬─────────────────────────────┘
-                 │
-┌────────────────▼─────────────────────────────┐
-│              Ocarina (single binary)         │
-│                                              │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
-│  │  Parser  │  │ Executor │  │  Assert  │    │
-│  │ (YAML →  │  │  (step   │  │ (expect/ │    │
-│  │  File)   │  │  runner) │  │  grab)   │    │
-│  └──────────┘  └────┬─────┘  └──────────┘    │
-│                     │                        │
-│  ┌──────────────────▼──────────────────┐     │
-│  │           MCP Client                 │     │
-│  │  initialize → tools/list →           │     │
-│  │  tools/call / resources/read         │     │
-│  └──────────────────────────────────────┘     │
-└─────────────────────────┬────────────────────┘
-                          │  stdio
-┌─────────────────────────▼────────────────────┐
-│              MCP Server(s)                    │
-│  (sqlite, github, fetch, blender, ...)        │
-└─────────────────────────────────────────────-┘
+   rondo.yaml   keys / servers / rondo: [ steps... ]
+        │   written by a human or an agent
+        ▼
+┌─────────────────────────────────────────────────────────┐
+│  Ocarina  (single binary, no LLM)                       │
+│                                                         │
+│    Parser      YAML  →  File                            │
+│    Executor    step runner · when · loop · retry        │
+│    Assert      grab · echo · expect                     │
+│    MCP client  initialize → tools/list → tools/call     │
+└────────────────────────────┬────────────────────────────┘
+                             │   stdio  or  Streamable HTTP
+                             ▼
+   MCP server(s)   local subprocess  or  remote url + headers
+   sqlite · github · fetch · blender · ...
 ```
 
 A rondo can target more than one server. Each is declared under `servers:` and selected per step with `server:`. Ocarina connects to each referenced server once and reuses the session.
@@ -64,7 +54,7 @@ Many servers do not set `isError` and instead return an error as ordinary text. 
 
 ### Variable capture (`grab:` and `echo:`)
 
-`grab:` takes a single [gjson](https://github.com/tidwall/gjson) path (`.0.sha`, `.name`, `#.title`) and extracts a value from the step's JSON output. `echo:` stores that value (or the whole output, if no `grab:`) into the key map under a name, for use in later steps via `{{key}}`. When the output is a Python repr rather than JSON (some servers do this), Ocarina normalizes it before applying the path.
+`grab:` takes a single [gjson](https://github.com/tidwall/gjson) path (`.0.sha`, `.name`, `#.title`) and extracts a value from the step's JSON output. `echo:` stores that value (or the whole output, if no `grab:`) into the key map under a name, for use in later steps via `{{key}}`. When a tool returns `structuredContent`, that typed JSON is the output `grab` and `expect` run against, rather than the text block. When a server instead returns a Python repr, Ocarina normalizes it to JSON before applying the path.
 
 ### Dynamic loops over server inventory
 
