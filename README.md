@@ -6,10 +6,10 @@
   <h1>Ocarina</h1>
   <p><strong>An automation framework for MCP servers.</strong> Write a YAML script, replay it deterministically, no LLM in the loop.</p>
 
-  <a href="assets/blender-demo.mp4">
+  <a href="https://github.com/msradam/blender-mcp-ocarina">
     <img src="assets/blender-demo.gif" alt="An Ocarina rondo building a 3D scene in Blender, one step at a time" width="100%">
   </a>
-  <p><sub>A rondo driving <a href="https://github.com/ahujasid/blender-mcp">blender-mcp</a>: lay down a plane, drop a cube, stack a sphere, add a cone, then verify the scene. Same YAML, same result, every run. No model involved. (Click for video.)</sub></p>
+  <p><sub>A rondo driving <a href="https://github.com/ahujasid/blender-mcp">blender-mcp</a>: lay down a plane, drop a cube, stack a sphere, add a cone, then verify the scene. Same YAML, same result, every run. No model involved. Clone <a href="https://github.com/msradam/blender-mcp-ocarina">blender-mcp-ocarina</a> to run it yourself.</sub></p>
 </div>
 
 The MCP ecosystem is already enormous: thousands of servers exposing real services through typed tools, readable resources, and schema-checked contracts, deployed and ready to call. Ocarina is an automation framework for all of it. Write a YAML script that drives tools across one or more servers, pipes values between steps, branches, loops, and retries, and runs the same way every time. No LLM in the loop, so every run is reproducible and costs nothing.
@@ -17,18 +17,6 @@ The MCP ecosystem is already enormous: thousands of servers exposing real servic
 These tools were built to be read by language models, and language models are trained on human language, so the tools read cleanly to people too. A server exposes named contracts like `get_issues` or `query_database`, not endpoints you wire up in code. Every server someone built for an AI assistant is one you can drive.
 
 What you write is a playbook: a portable artifact that captures an automation workflow over those servers, with MCP as the wire protocol. You can read it, review it in a pull request, version it, and run it anywhere the servers are reachable. Write it by hand or have an agent generate it. Either way it runs the same on every execution, with no sampling, no tokens, and nothing inferring between the file and the result.
-
-![Ocarina docs output](assets/screenshot-docs.png)
-
-![Ocarina play output](assets/screenshot-play.png)
-
-## Design principles
-
-- **Deterministic.** The same rondo produces the same result on every run. No sampling, no randomness.
-- **Protocol-native.** Talks MCP directly via `tools/call`, `resources/read`, and `resources/list`. Works with any compliant server.
-- **Assertions are first-class.** `play` exits non-zero if any `expect:` check fails. Rondos work as CI health checks out of the box.
-- **No credentials in scripts.** Server connection and environment variables stay outside the rondo file.
-- **One rondo, any machine.** If the MCP server is available, the rondo runs.
 
 ## Install
 
@@ -60,6 +48,14 @@ Validate a rondo against the live server without running any tools:
 ```bash
 ocarina validate db-audit.yaml
 ```
+
+## Design principles
+
+- **Deterministic.** The same rondo produces the same result on every run. No sampling, no randomness.
+- **Protocol-native.** Talks MCP directly via `tools/call`, `resources/read`, and `resources/list`. Works with any compliant server.
+- **Assertions are first-class.** `play` exits non-zero if any `expect:` check fails. Rondos work as CI health checks out of the box.
+- **No credentials in scripts.** Server connection and environment variables stay outside the rondo file.
+- **One rondo, any machine.** If the MCP server is available, the rondo runs.
 
 ## Rondo format
 
