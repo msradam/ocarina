@@ -193,7 +193,7 @@ Example:
 				}
 
 				if step.Expect != nil {
-					fail := checkExpect(step.Expect, output, isToolError, iterNotes)
+					fail := checkExpect(step.Expect, captured, isToolError, iterNotes)
 					if fail != "" {
 						fmt.Fprintf(os.Stderr, "    %s %s\n", red("FAIL:"), fail)
 						if !step.IgnoreErrors {
@@ -378,7 +378,7 @@ func resolveLoop(loop string, notes map[string]string) ([]string, error) {
 	resolved := interp.Apply(loop, notes).(string)
 	var arr []any
 	if err := json.Unmarshal([]byte(resolved), &arr); err != nil {
-		return nil, fmt.Errorf("loop value is not a JSON array: %w", err)
+		return nil, fmt.Errorf("loop must be a JSON array (e.g. '[\"UTC\", \"Tokyo\"]'), got: %s", truncate(resolved, 60))
 	}
 	items := make([]string, len(arr))
 	for i, v := range arr {

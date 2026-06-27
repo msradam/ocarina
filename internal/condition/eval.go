@@ -2,6 +2,7 @@ package condition
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/ext"
@@ -19,6 +20,9 @@ import (
 func EvalBool(expr string, vars map[string]string, output string) (bool, error) {
 	if expr == "" {
 		return false, fmt.Errorf("empty conditional expression is not allowed")
+	}
+	if strings.Contains(expr, "{{") {
+		return false, fmt.Errorf("expressions use bare variable names, not {{...}} — write e.g. %q not %q", "tz == 'UTC'", "{{tz}} == 'UTC'")
 	}
 
 	opts := []cel.EnvOption{
@@ -65,6 +69,9 @@ func EvalBool(expr string, vars map[string]string, output string) (bool, error) 
 func CheckSyntax(expr string) error {
 	if expr == "" {
 		return fmt.Errorf("empty conditional expression is not allowed")
+	}
+	if strings.Contains(expr, "{{") {
+		return fmt.Errorf("expressions use bare variable names, not {{...}} — write e.g. %q not %q", "tz == 'UTC'", "{{tz}} == 'UTC'")
 	}
 	// Parse-only environment: we don't know the variable names at validate time,
 	// so we skip type-checking and only verify syntactic correctness.

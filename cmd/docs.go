@@ -184,7 +184,12 @@ Example:
 			fmt.Fprintf(out, "  tool: %s\n", t.Name)
 			fmt.Fprintln(out, "  args:")
 			for _, name := range names {
-				fmt.Fprintf(out, "    %s: %s\n", name, docExampleValue(name, schema.Properties[name]))
+				v := docExampleValue(name, schema.Properties[name])
+				if len(v) > 0 && v[0] == '<' {
+					fmt.Fprintf(out, "    %s: %s  # replace with actual value\n", name, v)
+				} else {
+					fmt.Fprintf(out, "    %s: %s\n", name, v)
+				}
 			}
 			fmt.Fprint(out, "```\n\n---\n\n")
 		}
