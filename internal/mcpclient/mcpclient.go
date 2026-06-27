@@ -9,12 +9,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-type Session struct {
-	*mcp.ClientSession
-}
-
 // env is merged on top of the current process environment.
-func Connect(ctx context.Context, command string, args []string, env map[string]string) (*Session, error) {
+func Connect(ctx context.Context, command string, args []string, env map[string]string) (*mcp.ClientSession, error) {
 	cmd := exec.CommandContext(ctx, command, args...) //#nosec G204 -- ocarina's purpose is launching user-specified MCP servers
 	if len(env) > 0 {
 		cmd.Env = os.Environ()
@@ -27,5 +23,5 @@ func Connect(ctx context.Context, command string, args []string, env map[string]
 	if err != nil {
 		return nil, err
 	}
-	return &Session{cs}, nil
+	return cs, nil
 }

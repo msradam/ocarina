@@ -175,7 +175,7 @@ Example:
 }
 
 // isToolError is true when the server returned isError:true on a tool call.
-func dispatchStep(ctx context.Context, sess *mcpclient.Session, step playbook.Step, notes map[string]string) (output string, isToolError bool, err error) {
+func dispatchStep(ctx context.Context, sess *mcp.ClientSession, step playbook.Step, notes map[string]string) (output string, isToolError bool, err error) {
 	switch {
 	case step.Tool != "":
 		return callTool(ctx, sess, step, notes)
@@ -183,19 +183,12 @@ func dispatchStep(ctx context.Context, sess *mcpclient.Session, step playbook.St
 		return readResource(ctx, sess, step, notes)
 	case step.ListResources != "":
 		return listResources(ctx, sess, step, notes)
-	case step.Sleep != "":
-		d, parseErr := time.ParseDuration(step.Sleep)
-		if parseErr != nil {
-			return "", false, fmt.Errorf("sleep: invalid duration %q: %w", step.Sleep, parseErr)
-		}
-		time.Sleep(d)
-		return "", false, nil
 	default:
 		return "", false, fmt.Errorf("step has no tool, resource, list_resources, or sleep field")
 	}
 }
 
-func callTool(ctx context.Context, sess *mcpclient.Session, step playbook.Step, notes map[string]string) (string, bool, error) {
+func callTool(ctx context.Context, sess *mcp.ClientSession, step playbook.Step, notes map[string]string) (string, bool, error) {
 	var callArgs map[string]any
 	if step.Args != nil {
 		callArgs, _ = interp.Apply(step.Args, notes).(map[string]any)
@@ -234,7 +227,7 @@ func callTool(ctx context.Context, sess *mcpclient.Session, step playbook.Step, 
 	return strings.Join(parts, "\n"), result.IsError, nil
 }
 
-func readResource(ctx context.Context, sess *mcpclient.Session, step playbook.Step, notes map[string]string) (string, bool, error) {
+func readResource(ctx context.Context, sess *mcp.ClientSession, step playbook.Step, notes map[string]string) (string, bool, error) {
 	uri := interp.Apply(step.Resource, notes).(string)
 	result, err := sess.ReadResource(ctx, &mcp.ReadResourceParams{URI: uri})
 	if err != nil {
@@ -251,7 +244,7 @@ func readResource(ctx context.Context, sess *mcpclient.Session, step playbook.St
 	return strings.Join(parts, "\n"), false, nil
 }
 
-func listResources(ctx context.Context, sess *mcpclient.Session, _ playbook.Step, _ map[string]string) (string, bool, error) {
+func listResources(ctx context.Context, sess *mcp.ClientSession, _ playbook.Step, _ map[string]string) (string, bool, error) {
 	res, err := sess.ListResources(ctx, nil)
 	if err != nil {
 		return "", false, err
@@ -445,13 +438,14 @@ func pyReprToJSON(s string) string {
 	if len(s) == 0 || (s[0] != '[' && s[0] != '{') {
 		return ""
 	}
-	// booleans and null
-	s = strings.ReplaceAll(s, ": True", ": true")
-	s = strings.ReplaceAll(s, ": False", ": false")
-	s = strings.ReplaceAll(s, ": None", ": null")
-	s = strings.ReplaceAll(s, "[True", "[true")
-	s = strings.ReplaceAll(s, "[False", "[false")
-	s = strings.ReplaceAll(s, "[None", "[null")
+	s = strings.NewReplacer(
+		": True", ": true",
+		": False", ": false",
+		": None", ": null",
+		"[True", "[true",
+		"[False", "[false",
+		"[None", "[null",
+	).Replace(s)
 	// swap single-quoted strings to double-quoted
 	var b strings.Builder
 	inSingle := false

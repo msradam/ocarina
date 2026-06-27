@@ -15,7 +15,7 @@ Ocarina is a YAML automation framework for [MCP](https://modelcontextprotocol.io
 ## Design principles
 
 - **Deterministic.** The same rondo produces the same result on every run. No sampling, no randomness.
-- **Protocol-native.** Talks MCP directly — `tools/call`, `resources/read`, `resources/list`. Works with any compliant server.
+- **Protocol-native.** Talks MCP directly via `tools/call`, `resources/read`, and `resources/list`. Works with any compliant server.
 - **Assertions are first-class.** `play` exits non-zero if any `expect:` check fails. Rondos work as CI health checks out of the box.
 - **No credentials in scripts.** Server connection and environment variables stay outside the rondo file.
 - **One rondo, any machine.** If the MCP server is available, the rondo runs.
@@ -26,7 +26,7 @@ Ocarina is a YAML automation framework for [MCP](https://modelcontextprotocol.io
 go install github.com/msradam/ocarina@latest
 ```
 
-Binaries available on the [releases page](https://github.com/msradam/ocarina/releases). Requires Go 1.22+.
+Binaries are available on the [releases page](https://github.com/msradam/ocarina/releases). Requires Go 1.22+.
 
 ## Use
 
@@ -105,15 +105,15 @@ rondo:
 
 ## Commands
 
-**`ocarina docs <command> [args...]`** — generate markdown documentation for every tool, resource, and resource template a server exposes.
+**`ocarina docs <command> [args...]`**: generate markdown documentation for every tool, resource, and resource template a server exposes.
 
-**`ocarina play <rondo.yaml>`** — execute each step against the live server.
+**`ocarina play <rondo.yaml>`**: execute each step against the live server.
 
-**`ocarina validate <rondo.yaml>`** — check tool names, required args, schema types, and `{{key}}` data flow without making any calls.
+**`ocarina validate <rondo.yaml>`**: check tool names, required args, schema types, and `{{key}}` data flow without making any calls.
 
-**`ocarina hum <command> [args...] -- <tool> [key=value ...]`** — call a single tool and print the result.
+**`ocarina hum <command> [args...] -- <tool> [key=value ...]`**: call a single tool and print the result.
 
-**`ocarina record <output.yaml> <command> [args...]`** — proxy mode: record every tool call from a live MCP client session into a rondo file.
+**`ocarina record <output.yaml> <command> [args...]`**: proxy mode; records every tool call from a live MCP client session into a rondo file.
 
 ## Server names
 

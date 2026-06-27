@@ -102,20 +102,7 @@ Example:
 				name = fmt.Sprintf("step %d", i+1)
 			}
 
-			var label string
-			switch {
-			case step.Tool != "":
-				label = step.Tool
-			case step.Resource != "":
-				label = "resource:" + step.Resource
-			case step.ListResources != "":
-				label = "list_resources"
-			case step.Sleep != "":
-				label = "sleep:" + step.Sleep
-			default:
-				label = "?"
-			}
-			prefix := fmt.Sprintf("  %s (%s)", name, label)
+			prefix := fmt.Sprintf("  %s (%s)", name, stepLabel(step))
 
 			var errs, warns []string
 
