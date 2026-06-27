@@ -1,6 +1,6 @@
 # Tested MCP servers
 
-50 servers verified with `ocarina play`. Scores are in `examples/`.
+50 servers verified with `ocarina play`. Example rondos for each are in `examples/`.
 
 ## Official @modelcontextprotocol
 
