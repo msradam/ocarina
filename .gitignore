@@ -1,8 +1,12 @@
 # built binaries
 ocarina
+ocarina-dev
 ocarina-arm64
 ocarina-arm64-nocgo
 dist/
+
+# golangci-lint migrate backup
+.golangci.bck.yml
 
 # playwright session captures
 .playwright-mcp/

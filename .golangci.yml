@@ -1,27 +1,39 @@
+version: "2"
 linters:
   enable:
-    - staticcheck
     - gosec
-    - revive
-    - errcheck
-    - govet
-    - ineffassign
-    - unused
     - misspell
-    - gofmt
-
-linters-settings:
-  gosec:
-    excludes:
-      - G204  # subprocess via variable — intentional; ocarina's purpose is launching user-specified MCP servers
-  revive:
+    - revive
+  settings:
+    gosec:
+      excludes:
+        - G204
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: exported
-        disabled: true  # small CLI, not a library
-
-issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gosec
-        - errcheck
+      - linters:
+          - errcheck
+          - gosec
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
