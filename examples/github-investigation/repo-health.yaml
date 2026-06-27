@@ -1,4 +1,4 @@
-vars:
+keys:
   owner: pytorch
   repo: pytorch
 
@@ -16,7 +16,7 @@ rondo:
       repo: "{{repo}}"
       per_page: 1
     grab: ".0.sha"
-    register: latest_sha
+    echo: latest_sha
 
   - name: commit message
     tool: list_commits

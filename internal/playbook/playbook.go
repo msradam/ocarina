@@ -8,7 +8,7 @@ import (
 )
 
 type Cassette struct {
-	Vars   map[string]string `yaml:"vars,omitempty"`
+	Keys   map[string]string `yaml:"keys,omitempty"`
 	Server Server            `yaml:"server"`
 	Rondo  []Step            `yaml:"rondo"`
 	LLM    []LLMRound        `yaml:"llm,omitempty"`
@@ -44,7 +44,7 @@ type Step struct {
 	When          string         `yaml:"when,omitempty"`
 	Timeout       string         `yaml:"timeout,omitempty"`
 	Retry         *RetryConfig   `yaml:"retry,omitempty"`
-	Register      string         `yaml:"register,omitempty"`
+	Echo          string         `yaml:"echo,omitempty"`
 	Grab          string         `yaml:"grab,omitempty"`
 	Loop          string         `yaml:"loop,omitempty"`
 	Tags          []string       `yaml:"tags,omitempty"`

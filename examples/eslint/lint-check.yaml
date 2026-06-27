@@ -1,4 +1,4 @@
-vars:
+keys:
   target: /tmp/eslint-test/test.js
 
 server:

@@ -1,4 +1,4 @@
-vars:
+keys:
   target_file: /path/to/your/file.go
 
 server:

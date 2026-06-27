@@ -47,8 +47,8 @@ Example:
 			return fmt.Errorf("load rondo: %w", err)
 		}
 
-		notes := make(map[string]string, len(c.Vars))
-		for k, v := range c.Vars {
+		notes := make(map[string]string, len(c.Keys))
+		for k, v := range c.Keys {
 			notes[k] = v
 		}
 		// -e key=value overrides rondo keys
@@ -174,8 +174,8 @@ Example:
 				}
 				fmt.Fprintf(os.Stdout, "%s\n", colorOutput(displayed))
 
-				if step.Register != "" {
-					notes[step.Register] = captured
+				if step.Echo != "" {
+					notes[step.Echo] = captured
 				}
 
 				if step.Expect != nil {

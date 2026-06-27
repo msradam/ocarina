@@ -6,7 +6,7 @@
 # Parameterize notes.project to model any software project's dependency graph.
 # Shows: create_entities, create_relations, search_nodes, open_nodes, delete_entities.
 
-vars:
+keys:
   project: ocarina
 
 server:

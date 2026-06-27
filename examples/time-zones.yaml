@@ -4,7 +4,7 @@
 #
 # Shows: notes: interpolation, sequential convert_time calls
 
-vars:
+keys:
   meeting_time: "15:00"
   base_tz: America/New_York
 

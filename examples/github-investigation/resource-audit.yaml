@@ -1,4 +1,4 @@
-vars:
+keys:
   github_token: "{{env.GITHUB_TOKEN}}"
   owner: msradam
   repo: ocarina
@@ -12,7 +12,7 @@ server:
 rondo:
   - name: read go.mod
     resource: "repo://{{owner}}/{{repo}}/contents/go.mod"
-    register: gomod
+    echo: gomod
     expect:
       contains: module
 
@@ -23,12 +23,12 @@ rondo:
 
   - name: read README
     resource: "repo://{{owner}}/{{repo}}/contents/README.md"
-    register: readme
+    echo: readme
 
   - name: check for ci workflow
     resource: "repo://{{owner}}/{{repo}}/contents/.github/workflows/ci.yml"
     ignore_errors: true
-    register: ci_config
+    echo: ci_config
 
   - name: recent commits on main
     tool: list_commits
@@ -37,7 +37,7 @@ rondo:
       repo: "{{repo}}"
       sha: main
     grab: ".0.sha"
-    register: latest_sha
+    echo: latest_sha
 
   - name: read tree at latest commit
     resource: "repo://{{owner}}/{{repo}}/git/trees/{{latest_sha}}"

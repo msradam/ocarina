@@ -1,4 +1,4 @@
-vars: {}
+keys: {}
 server:
   command: uvx
   args: ["mcp-server-trello"]

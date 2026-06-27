@@ -1,4 +1,4 @@
-vars:
+keys:
   db: /tmp/ocarina_demo.db
 
 server:

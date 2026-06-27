@@ -1,7 +1,7 @@
 # notes: defines values interpolated as {{key}} throughout all tracks
 # echo: captures a track's text output into a note for later tracks
 
-vars:
+keys:
   dir: /private/tmp/ocarina-demo
   filename: result.txt
 
@@ -25,7 +25,7 @@ rondo:
     tool: read_file
     args:
       path: "{{dir}}/{{filename}}"
-    register: file_contents        # captures output into notes.file_contents
+    echo: file_contents        # captures output into notes.file_contents
 
   - name: write a record of what we read
     tool: write_file

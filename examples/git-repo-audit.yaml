@@ -4,7 +4,7 @@
 #
 # Shows: notes: for repo path, multi-track sequential inspection
 
-vars:
+keys:
   repo: /path/to/your/repo
 
 server:

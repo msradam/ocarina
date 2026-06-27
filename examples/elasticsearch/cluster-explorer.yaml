@@ -1,4 +1,4 @@
-vars:
+keys:
   es_host: http://localhost:9200
 
 server:

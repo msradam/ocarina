@@ -1,4 +1,4 @@
-vars:
+keys:
   amount: "1000"
   base: USD
 

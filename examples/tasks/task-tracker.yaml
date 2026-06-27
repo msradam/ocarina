@@ -1,4 +1,4 @@
-vars:
+keys:
   file: /tmp/my-tasks.md
 
 server:

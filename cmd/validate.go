@@ -49,8 +49,8 @@ Example:
 		if err := resolveServer(&c.Server); err != nil {
 			return err
 		}
-		serverArgs := interp.Strings(c.Server.Args, c.Vars)
-		serverEnv := interp.StringMap(c.Server.Env, c.Vars)
+		serverArgs := interp.Strings(c.Server.Args, c.Keys)
+		serverEnv := interp.StringMap(c.Server.Env, c.Keys)
 		sess, err := mcpclient.Connect(ctx, c.Server.Command, serverArgs, serverEnv)
 		if err != nil {
 			return fmt.Errorf("connect: %w", err)
@@ -89,9 +89,9 @@ Example:
 			schemas[t.Name] = entry
 		}
 
-		// data-flow: vars available via vars: + prior register: fields
+		// data-flow: keys available via keys: + prior echo: fields
 		available := make(map[string]bool)
-		for k := range c.Vars {
+		for k := range c.Keys {
 			available[k] = true
 		}
 
@@ -171,8 +171,8 @@ Example:
 			}
 
 			// list_resources: stores URIs for loop:
-			if step.ListResources != "" && step.Register != "" {
-				available[step.Register] = true
+			if step.ListResources != "" && step.Echo != "" {
+				available[step.Echo] = true
 			}
 
 			// CEL syntax checks (parse-only; variables not known at validate time)
@@ -207,8 +207,8 @@ Example:
 			totalErrs += len(errs)
 			totalWarns += len(warns)
 
-			if step.Register != "" {
-				available[step.Register] = true
+			if step.Echo != "" {
+				available[step.Echo] = true
 			}
 		}
 

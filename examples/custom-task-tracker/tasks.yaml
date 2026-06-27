@@ -8,7 +8,7 @@ rondo:
     args:
       title: Buy groceries
       description: Milk, eggs, bread
-    register: task1_id
+    echo: task1_id
     grab: ".id"
 
   - name: add task 2 - Write tests
@@ -16,7 +16,7 @@ rondo:
     args:
       title: Write tests
       description: Unit tests for the auth module
-    register: task2_id
+    echo: task2_id
     grab: ".id"
 
   - name: add task 3 - Deploy app
@@ -24,7 +24,7 @@ rondo:
     args:
       title: Deploy app
       description: Push v1.2.0 to production
-    register: task3_id
+    echo: task3_id
     grab: ".id"
 
   - name: list all tasks

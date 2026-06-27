@@ -1,4 +1,4 @@
-vars:
+keys:
   start_url: https://modelcontextprotocol.io
 
 server:

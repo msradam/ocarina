@@ -9,7 +9,7 @@
 # Note: puppeteer_screenshot returns base64 image data — ocarina prints
 # "[image ...]" for non-text content rather than dumping binary.
 
-vars:
+keys:
   url: https://example.com
 
 server:
@@ -28,7 +28,7 @@ rondo:
     tool: puppeteer_evaluate
     args:
       script: "JSON.stringify({ title: document.title, url: window.location.href, h1: document.querySelector('h1')?.textContent })"
-    register: page_info
+    echo: page_info
     expect:
       contains: "title"
 
