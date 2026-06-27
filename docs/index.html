@@ -354,9 +354,9 @@
 
         <div class="code-wrap" style="max-width:480px">
           <div class="code-label">terminal</div>
-          <pre><code class="language-bash">ocarina docs   uvx mcp-server-fetch
-ocarina record session.yaml uvx mcp-server-fetch
-ocarina play   session.yaml</code></pre>
+          <pre><code class="language-bash">ocarina docs     uvx mcp-server-time   # discover a server's tools
+ocarina play     clock.yaml            # run a rondo, assert on results
+ocarina validate clock.yaml            # check it without calling tools</code></pre>
         </div>
 
         <div class="lk-measure" style="margin-top:var(--space-6)">
@@ -383,19 +383,19 @@ ocarina play   session.yaml</code></pre>
 
       <div class="lk-grid lk-cols-3" style="margin-top:var(--space-4)">
         <article class="lk-feature">
-          <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Record</p>
-          <h3 class="lk-feature-title">Capture any session</h3>
-          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Run ocarina as a transparent stdio proxy. Every <code class="lk-code-inline">tools/call</code> request and response goes into a YAML rondo, including <code class="lk-code-inline">sampling/createMessage</code> LLM callbacks from agentic servers.</p>
-        </article>
-        <article class="lk-feature">
-          <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Play</p>
-          <h3 class="lk-feature-title">Replay without an LLM</h3>
-          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Execute every step in order. Chain outputs with <code class="lk-code-inline">echo:</code> and <code class="lk-code-inline">grab:</code>. Assert on results with <code class="lk-code-inline">expect:</code>. Exits non-zero if an assertion fails, so it works as a CI step.</p>
-        </article>
-        <article class="lk-feature">
           <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Docs</p>
           <h3 class="lk-feature-title">Document any server</h3>
           <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Generate markdown for every tool and resource a server exposes, with a copy-paste example step for each. The fastest way to start a new rondo.</p>
+        </article>
+        <article class="lk-feature">
+          <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Play</p>
+          <h3 class="lk-feature-title">Run without an LLM</h3>
+          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Execute every step in order. Chain outputs with <code class="lk-code-inline">echo:</code> and <code class="lk-code-inline">grab:</code>. Assert on results with <code class="lk-code-inline">expect:</code>. Exits non-zero if an assertion fails, so it works as a CI step.</p>
+        </article>
+        <article class="lk-feature">
+          <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Record</p>
+          <h3 class="lk-feature-title">Capture any session</h3>
+          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Run ocarina as a transparent stdio proxy. Every <code class="lk-code-inline">tools/call</code> request and response goes into a YAML rondo, including <code class="lk-code-inline">sampling/createMessage</code> LLM callbacks from agentic servers.</p>
         </article>
       </div>
     </section>
@@ -405,7 +405,7 @@ ocarina play   session.yaml</code></pre>
       <div class="lk-running-head"><span class="lk-eyebrow">02</span><span class="lk-eyebrow">Install</span></div>
       <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Install</h2>
 
-      <p style="color:var(--text-body);margin-bottom:var(--space-4)">Requires Go 1.26.4+.</p>
+      <p style="color:var(--text-body);margin-bottom:var(--space-4)">Requires Go 1.26+.</p>
 
       <div class="code-wrap" style="max-width:500px">
         <div class="code-label">go install</div>
@@ -416,29 +416,41 @@ ocarina play   session.yaml</code></pre>
 
       <h3 class="lk-h3" style="margin:var(--space-6) 0 var(--space-3)">Quick start</h3>
 
-      <p style="color:var(--text-body);margin-bottom:var(--space-3)">Discover what tools a server exposes:</p>
+      <p style="color:var(--text-body);margin-bottom:var(--space-3)">See what a server exposes. <code class="lk-code-inline">mcp-server-time</code> needs no credentials:</p>
       <div class="code-wrap">
         <div class="code-label">terminal</div>
-        <pre><code class="language-bash">ocarina docs uvx mcp-server-time
-# writes markdown to stdout: one section per tool, with an
-# argument table and a copy-paste example step for each</code></pre>
+        <pre><code class="language-bash">ocarina docs uvx mcp-server-time</code></pre>
       </div>
 
-      <p style="color:var(--text-body);margin:var(--space-4) 0 var(--space-3)">Configure your MCP host to run Ocarina instead of the server directly, then use it normally:</p>
+      <p style="color:var(--text-body);margin:var(--space-4) 0 var(--space-3)">Write a rondo:</p>
       <div class="code-wrap">
-        <div class="code-label">terminal</div>
-        <pre><code class="language-bash">ocarina record session.yaml uvx mcp-server-fetch
-# ... use your MCP host normally ...
-# ocarina: recorded 3 step(s) to session.yaml</code></pre>
+        <div class="code-label">clock.yaml</div>
+        <pre><code class="language-yaml">server:
+  command: uvx
+  args: [mcp-server-time]
+
+rondo:
+  - name: time in Tokyo
+    tool: get_current_time
+    args:
+      timezone: Asia/Tokyo
+    expect:
+      contains: "datetime"</code></pre>
       </div>
 
-      <p style="color:var(--text-body);margin:var(--space-4) 0 var(--space-3)">Play it back without an LLM:</p>
+      <p style="color:var(--text-body);margin:var(--space-4) 0 var(--space-3)">Play it. No LLM, no API key:</p>
       <div class="code-wrap">
         <div class="code-label">terminal</div>
-        <pre><code class="language-bash">ocarina play session.yaml
-# ==> fetch (fetch)
-# &lt;html&gt;...</code></pre>
+        <pre><code class="language-bash">ocarina play clock.yaml
+# ==> time in Tokyo (get_current_time)
+# {
+#   "datetime": "2026-06-27T09:30:00+09:00",
+#   "timezone": "Asia/Tokyo"
+# }
+#     PASS: contains "datetime"</code></pre>
       </div>
+
+      <p style="color:var(--text-muted);font-size:var(--type-sm);margin-top:var(--space-4)">To capture a live session instead of writing one, see <a class="lk-link" href="#record">record</a>. For ready-made environments you can clone and run, see <a class="lk-link" href="#showcases">Showcases</a>.</p>
     </section>
 
     <!-- Rondo format -->
