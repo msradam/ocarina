@@ -1,12 +1,13 @@
 Output assets/demo.gif
 
 Set Shell "zsh"
-Set FontSize 13
-Set Width 1100
+Set FontSize 14
+Set Width 1200
 Set Height 650
 Set Padding 24
 Set Framerate 24
-Set PlaybackSpeed 1
+Set TypingSpeed 80ms
+Set PlaybackSpeed 0.75
 
 Set Theme {
   "name": "Everforest Dark",
@@ -32,41 +33,32 @@ Set Theme {
   "cursorColor": "#d3c6aa"
 }
 
-# setup — hidden
 Hide
-Type "export PATH=$HOME/bin:$PATH && export PS1='❯ ' && cd /Users/amsrahman/ocarina"
+Type "export PATH=$HOME/bin:/opt/homebrew/bin:$PATH && export PS1='$ ' && cd /Users/amsrahman/ocarina"
 Enter
-Sleep 500ms
+Sleep 300ms
+Type "unsetopt PROMPT_CR PROMPT_SP 2>/dev/null; true"
+Enter
+Sleep 300ms
+Type "bash assets/demo-setup.sh"
+Enter
+Sleep 2s
 Ctrl+L
 Show
 
-# --- scene 1: show what a cassette looks like ---
-Sleep 1.5s
-Type "bat --theme=gruvbox-dark --paging=never examples/time-zones.yaml"
-Sleep 600ms
+# --- scene 1: show the rondo so the viewer reads the tool + args ---
+Sleep 1s
+Type "cat examples/sqlite/demo-report.yaml"
+Sleep 500ms
 Enter
-Sleep 5s
+Sleep 6s
 
-# let it breathe
-Sleep 3s
-
-# --- scene 2: play that cassette ---
+# --- scene 2: play it ---
 Ctrl+L
 Sleep 1s
-Type "ocarina play examples/time-zones.yaml"
-Sleep 600ms
+Type "ocarina play examples/sqlite/demo-report.yaml"
+Sleep 500ms
 Enter
-Sleep 9s
+Sleep 30s
 
-# let results breathe
-Sleep 3s
-
-# --- scene 3: assertions in CI ---
-Ctrl+L
-Sleep 1s
-Type "ocarina play examples/mcp-smoke-test.yaml"
-Sleep 600ms
-Enter
-Sleep 7s
-
-Sleep 3s
+Sleep 8s

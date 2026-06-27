@@ -12,7 +12,7 @@ var rootCmd = &cobra.Command{
 	Short: "MCP cassette recorder and player",
 	Long: `ocarina records, composes, and plays back MCP tool call cassettes.
 
-Record a live session. Play it back without an LLM. Every tool call is a track.`,
+Record a live session. Play it back without an LLM. Every tool call is a step in a rondo.`,
 }
 
 func Execute() {

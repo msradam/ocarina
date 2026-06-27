@@ -1,37 +1,39 @@
 keys:
-  github_token: YOUR_GITHUB_PERSONAL_ACCESS_TOKEN
-  owner: msradam
-  repo: ocarina
+  owner: pytorch
+  repo: pytorch
 
 server:
   command: npx
   args: ["-y", "@modelcontextprotocol/server-github"]
   env:
-    GITHUB_PERSONAL_ACCESS_TOKEN: "{{github_token}}"
+    GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_PERSONAL_ACCESS_TOKEN}}"
 
 rondo:
-  - name: repository overview
-    tool: get_repository
+  - name: latest commit
+    tool: list_commits
     args:
       owner: "{{owner}}"
       repo: "{{repo}}"
-    expect:
-      contains: "{{repo}}"
+      per_page: 1
+    grab: ".0.sha"
+    echo: latest_sha
 
-  - name: open issues
+  - name: commit message
+    tool: list_commits
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+      per_page: 1
+    grab: ".0.commit.message"
+
+  - name: recent open issues
     tool: list_issues
     args:
       owner: "{{owner}}"
       repo: "{{repo}}"
       state: open
-
-  - name: recent commits
-    tool: list_commits
-    args:
-      owner: "{{owner}}"
-      repo: "{{repo}}"
-    expect:
-      contains: "{{owner}}"
+      per_page: 5
+    grab: ".0.title"
 
   - name: open pull requests
     tool: list_pull_requests
@@ -39,3 +41,5 @@ rondo:
       owner: "{{owner}}"
       repo: "{{repo}}"
       state: open
+      per_page: 3
+    grab: ".0.title"

@@ -13,7 +13,6 @@ type Session struct {
 	*mcp.ClientSession
 }
 
-// Connect spawns the given command and connects to it as an MCP client.
 // env is merged on top of the current process environment.
 func Connect(ctx context.Context, command string, args []string, env map[string]string) (*Session, error) {
 	cmd := exec.CommandContext(ctx, command, args...) //#nosec G204 -- ocarina's purpose is launching user-specified MCP servers

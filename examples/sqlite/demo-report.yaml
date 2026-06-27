@@ -1,0 +1,37 @@
+keys:
+  db: /tmp/ocarina-demo.db
+
+server:
+  command: uvx
+  args: ["mcp-server-sqlite", "--db-path", "{{db}}"]
+
+rondo:
+  - name: total customers
+    tool: read_query
+    args:
+      query: "SELECT COUNT(*) AS total FROM customers"
+
+  - name: revenue by customer
+    tool: read_query
+    args:
+      query: >
+        SELECT c.name, COUNT(o.id) AS orders,
+               ROUND(SUM(o.amount), 2) AS revenue
+        FROM customers c JOIN orders o ON o.customer_id = c.id
+        GROUP BY c.id ORDER BY revenue DESC
+
+  - name: top-selling product
+    tool: read_query
+    args:
+      query: >
+        SELECT product, COUNT(*) AS sold,
+               ROUND(SUM(amount), 2) AS revenue
+        FROM orders GROUP BY product ORDER BY revenue DESC LIMIT 1
+
+  - name: recent orders
+    tool: read_query
+    args:
+      query: >
+        SELECT c.name AS customer, o.product, o.amount
+        FROM orders o JOIN customers c ON c.id = o.customer_id
+        ORDER BY o.id DESC LIMIT 3

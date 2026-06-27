@@ -26,7 +26,7 @@ var (
 var validateCmd = &cobra.Command{
 	Use:   "validate <cassette.yaml>",
 	Short: "Validate a cassette against the server's tool schemas without running any tools",
-	Long: `Connects to the server, fetches tool schemas, and checks every track for:
+	Long: `Connects to the server, fetches tool schemas, and checks every step for:
   - tool exists on the server
   - required args are present
   - arg types match the schema
@@ -45,6 +45,9 @@ Example:
 		}
 
 		ctx := context.Background()
+		if err := resolveServer(&c.Server); err != nil {
+			return err
+		}
 		serverArgs := interp.Strings(c.Server.Args, c.Keys)
 		serverEnv := interp.StringMap(c.Server.Env, c.Keys)
 		sess, err := mcpclient.Connect(ctx, c.Server.Command, serverArgs, serverEnv)
@@ -93,68 +96,95 @@ Example:
 
 		var totalErrs, totalWarns int
 
-		for i, track := range c.Rondo {
-			name := track.Name
+		for i, step := range c.Rondo {
+			name := step.Name
 			if name == "" {
-				name = fmt.Sprintf("track %d", i+1)
+				name = fmt.Sprintf("step %d", i+1)
 			}
-			prefix := fmt.Sprintf("  %s (%s)", name, track.Tool)
+
+			var label string
+			switch {
+			case step.Tool != "":
+				label = step.Tool
+			case step.Resource != "":
+				label = "resource:" + step.Resource
+			case step.ListResources != "":
+				label = "list_resources"
+			case step.Sleep != "":
+				label = "sleep:" + step.Sleep
+			default:
+				label = "?"
+			}
+			prefix := fmt.Sprintf("  %s (%s)", name, label)
 
 			var errs, warns []string
 
-			entry, found := schemas[track.Tool]
-			if !found {
-				errs = append(errs, fmt.Sprintf("tool %q not found on server", track.Tool))
-			} else {
-				// required args present
-				for _, req := range entry.required {
-					if _, ok := track.Args[req]; !ok {
-						errs = append(errs, fmt.Sprintf("missing required arg %q", req))
-					}
-				}
-
-				// unknown args
-				for arg := range track.Args {
-					if _, ok := entry.properties[arg]; !ok && len(entry.properties) > 0 {
-						warns = append(warns, fmt.Sprintf("arg %q not in schema", arg))
-					}
-				}
-
-				// type validation via JSON Schema (skips template values)
-				if entry.raw != nil {
-					filtered := make(map[string]any)
-					for k, v := range track.Args {
-						if s, ok := v.(string); ok && templateKeyRe.MatchString(s) {
-							continue
+			if step.Tool != "" {
+				entry, found := schemas[step.Tool]
+				if !found {
+					errs = append(errs, fmt.Sprintf("tool %q not found on server", step.Tool))
+				} else {
+					for _, req := range entry.required {
+						if _, ok := step.Args[req]; !ok {
+							errs = append(errs, fmt.Sprintf("missing required arg %q", req))
 						}
-						filtered[k] = v
 					}
-					if len(filtered) > 0 {
-						var s jschema.Schema
-						if err := json.Unmarshal(entry.raw, &s); err == nil {
-							s.Required = nil // checked separately; don't fail on missing template args
-							if resolved, err := s.Resolve(nil); err == nil {
-								if valErr := resolved.Validate(filtered); valErr != nil {
-									errs = append(errs, valErr.Error())
+					for arg := range step.Args {
+						if _, ok := entry.properties[arg]; !ok && len(entry.properties) > 0 {
+							warns = append(warns, fmt.Sprintf("arg %q not in schema", arg))
+						}
+					}
+					// skip {{key}} strings; JSON Schema can't validate unresolved templates
+					if entry.raw != nil {
+						filtered := make(map[string]any)
+						for k, v := range step.Args {
+							if s, ok := v.(string); ok && templateKeyRe.MatchString(s) {
+								continue
+							}
+							filtered[k] = v
+						}
+						if len(filtered) > 0 {
+							var s jschema.Schema
+							if err := json.Unmarshal(entry.raw, &s); err == nil {
+								s.Required = nil // checked separately; don't fail on missing template args
+								if resolved, err := s.Resolve(nil); err == nil {
+									if valErr := resolved.Validate(filtered); valErr != nil {
+										errs = append(errs, valErr.Error())
+									}
 								}
 							}
 						}
 					}
 				}
-			}
 
-			// data-flow: {{key}} references must be available at this point
-			for arg, val := range track.Args {
-				s, ok := val.(string)
-				if !ok {
-					continue
-				}
-				for _, m := range templateKeyRe.FindAllStringSubmatch(s, -1) {
-					key := m[1]
-					if !available[key] {
-						warns = append(warns, fmt.Sprintf("arg %q: {{%s}} not in keys and no prior track sets it via echo:", arg, key))
+				// data-flow: {{key}} references must be available at this point
+				for arg, val := range step.Args {
+					s, ok := val.(string)
+					if !ok {
+						continue
+					}
+					for _, m := range templateKeyRe.FindAllStringSubmatch(s, -1) {
+						key := m[1]
+						if !available[key] {
+							warns = append(warns, fmt.Sprintf("arg %q: {{%s}} not in keys and no prior step sets it via echo:", arg, key))
+						}
 					}
 				}
+			}
+
+			// check {{key}} refs in resource URI
+			if step.Resource != "" {
+				for _, m := range templateKeyRe.FindAllStringSubmatch(step.Resource, -1) {
+					key := m[1]
+					if !available[key] {
+						warns = append(warns, fmt.Sprintf("resource URI: {{%s}} not defined", key))
+					}
+				}
+			}
+
+			// list_resources: stores URIs for loop:
+			if step.ListResources != "" && step.Echo != "" {
+				available[step.Echo] = true
 			}
 
 			if len(errs) == 0 && len(warns) == 0 {
@@ -172,14 +202,14 @@ Example:
 			totalErrs += len(errs)
 			totalWarns += len(warns)
 
-			if track.Echo != "" {
-				available[track.Echo] = true
+			if step.Echo != "" {
+				available[step.Echo] = true
 			}
 		}
 
 		fmt.Fprintln(os.Stdout)
 		if totalErrs == 0 && totalWarns == 0 {
-			fmt.Fprintf(os.Stdout, "%s\n", color.GreenString("all %d track(s) valid", len(c.Rondo)))
+			fmt.Fprintf(os.Stdout, "%s\n", color.GreenString("all %d step(s) valid", len(c.Rondo)))
 			return nil
 		}
 		fmt.Fprintf(os.Stdout, "%s\n", color.RedString("%d error(s)", totalErrs)+color.YellowString(", %d warning(s)", totalWarns))

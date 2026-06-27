@@ -6,23 +6,19 @@
   <h1>Ocarina</h1>
 </div>
 
-When an AI agent uses tools (querying a database, reading files, calling an API), those tool calls are deterministic. The LLM deciding which ones to make is not.
+Ocarina is a YAML automation framework for [MCP](https://modelcontextprotocol.io) servers. Write a declarative script that calls MCP tools in sequence, asserts on results, and pipes values between steps. No LLM involved.
 
-Ocarina sits between your LLM client and your MCP servers, records every tool call to a YAML cassette, and replays them exactly. No LLM needed. No API keys in CI.
+![Ocarina docs output](assets/screenshot-docs.png)
 
-```
-ocarina record session.yaml uvx mcp-server-fetch
-ocarina play   session.yaml
-ocarina compose uvx mcp-server-fetch
-```
+![Ocarina play output](assets/screenshot-play.png)
 
-![Ocarina demo](assets/demo.gif)
+## Design principles
 
-## Why
-
-MCP (Model Context Protocol) is how LLMs connect to external tools: filesystems, databases, APIs, browsers. A session produces a sequence of tool calls. That sequence is reproducible. The LLM's reasoning about it is not.
-
-Ocarina captures the tool-call layer. A recorded cassette is a YAML file you can commit to git, run in CI without an LLM, parameterize with variables, and use as a regression test. Same file, all of that.
+- **Deterministic.** The same rondo produces the same result on every run. No sampling, no randomness.
+- **Protocol-native.** Talks MCP directly — `tools/call`, `resources/read`, `resources/list`. Works with any compliant server.
+- **Assertions are first-class.** `play` exits non-zero if any `expect:` check fails. Rondos work as CI health checks out of the box.
+- **No credentials in scripts.** Server connection and environment variables stay outside the rondo file.
+- **One rondo, any machine.** If the MCP server is available, the rondo runs.
 
 ## Install
 
@@ -30,180 +26,147 @@ Ocarina captures the tool-call layer. A recorded cassette is a YAML file you can
 go install github.com/msradam/ocarina@latest
 ```
 
-Or download a binary from [releases](https://github.com/msradam/ocarina/releases).
+Binaries available on the [releases page](https://github.com/msradam/ocarina/releases). Requires Go 1.22+.
 
-Requires Go 1.26.4+.
+## Use
 
-## Quick start
-
-Discover what tools a server exposes:
+Generate markdown docs for a server:
 
 ```bash
-ocarina compose uvx mcp-server-fetch
-# Server: uvx [mcp-server-fetch]
-# 1 tool(s) available:
-#
-#   tool: fetch
-#     description: Fetches a URL from the internet...
+ocarina docs uvx mcp-server-sqlite --db-path mydb.sqlite
+ocarina docs npx -y @modelcontextprotocol/server-github > docs/github.md
 ```
 
-Configure your MCP host to run Ocarina instead of the server directly, then use it normally:
+Run a rondo:
 
 ```bash
-ocarina record session.yaml uvx mcp-server-fetch
-# ... use your MCP host normally ...
-# ocarina: recorded 3 track(s) to session.yaml
+ocarina play db-audit.yaml
+ocarina play db-audit.yaml --dry-run
+ocarina play db-audit.yaml -e db=/tmp/other.sqlite  # override a key at runtime
 ```
 
-Play it back without an LLM:
+Validate a rondo against the live server without running any tools:
 
 ```bash
-ocarina play session.yaml
-# ==> fetch (fetch)
-# <html>...
+ocarina validate db-audit.yaml
 ```
 
-## Cassette format
+## Rondo format
 
-A cassette is a YAML file. Write one by hand or record it from a live session.
+A rondo is a YAML file with three sections.
 
 ```yaml
-# Investigate any GitHub repo. Swap keys.owner and keys.repo to change repos.
 keys:
-  owner: modelcontextprotocol
-  repo: go-sdk
+  owner: acme
+  repo: api
 
 server:
   command: npx
   args: [-y, "@modelcontextprotocol/server-github"]
 
 rondo:
-  - name: list recent commits
+  - name: recent commits
     tool: list_commits
     args:
       owner: "{{owner}}"
       repo: "{{repo}}"
-      per_page: 5
-    echo: commits_json      # capture output into keys
-    grab: ".0.sha"          # extract first SHA from JSON array
+    grab: ".0.sha"
+    echo: latest_sha
 
-  - name: show latest commit
+  - name: commit detail
     tool: get_commit
     args:
       owner: "{{owner}}"
       repo: "{{repo}}"
-      sha: "{{commits_json}}"  # value from previous track
-
-  - name: list open issues
-    tool: list_issues
-    args:
-      owner: "{{owner}}"
-      repo: "{{repo}}"
-      state: open
+      sha: "{{latest_sha}}"
+    expect:
+      contains: "feat"
 ```
 
-### Track fields
+### Step fields
 
 | Field | Description |
 |---|---|
 | `tool` | Tool name to call |
-| `args` | Arguments. `{{key}}` interpolates from `keys`. |
-| `echo` | Capture text output into `keys` under this key |
-| `grab` | Dot-path into JSON output (`.0.sha`, `.name`), applied before `echo` captures |
-| `expect.contains` | Assert output contains this string. `play` exits non-zero if not. |
-| `result` | Recorded output, optional, kept for reference |
+| `resource` | Resource URI to read (`resources/read`) |
+| `list_resources` | Server prefix to list resources from; output is a JSON URI array |
+| `args` | Tool arguments. `{{key}}` interpolates from `keys` or prior `echo` captures |
+| `echo` | Store this step's output under a key for later steps |
+| `grab` | Dot-path into JSON output before storing: `.0.sha`, `.name`, `.items.0.id` |
+| `loop` | Expand a JSON array key into repeated iterations; sets `{{item}}` each time |
+| `expect.contains` | Assert output contains this string |
+| `expect.matches` | Assert output matches this regex |
+| `expect.equals` | Assert output equals this string (whitespace-trimmed) |
+| `expect.is_error` | Assert whether the tool returned `isError: true` |
+| `ignore_errors` | Continue past failures instead of halting |
+| `tags` | Tag this step for `--tags` / `--skip-tags` filtering |
 
-### Cassette-level fields
-
-| Field | Description |
-|---|---|
-| `keys` | Static variables, interpolated as `{{key}}` throughout |
-| `server` | Command and args to launch the MCP server |
-| `llm` | Captured `sampling/createMessage` exchanges from agentic servers |
+`{{env.NAME}}` resolves from the process environment and works anywhere `{{key}}` does.
 
 ## Commands
 
-### `ocarina record <output.yaml> <command> [args...]`
+**`ocarina docs <command> [args...]`** — generate markdown documentation for every tool, resource, and resource template a server exposes.
 
-Sits as a transparent stdio proxy between your MCP host and server. Records every `tools/call` request and response. Also captures `sampling/createMessage` exchanges when an agentic server calls back to the LLM.
+**`ocarina play <rondo.yaml>`** — execute each step against the live server.
 
-```bash
-ocarina record out.yaml uvx mcp-server-sqlite --db-path /tmp/db.sqlite
-ocarina record out.yaml npx -y @modelcontextprotocol/server-github
+**`ocarina validate <rondo.yaml>`** — check tool names, required args, schema types, and `{{key}}` data flow without making any calls.
+
+**`ocarina hum <command> [args...] -- <tool> [key=value ...]`** — call a single tool and print the result.
+
+**`ocarina record <output.yaml> <command> [args...]`** — proxy mode: record every tool call from a live MCP client session into a rondo file.
+
+## Server names
+
+Create a `.mcp.json` (or `~/.mcp.json` for credentials) and reference servers by name in rondos and on the command line:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_..." }
+    }
+  }
+}
 ```
 
-Flags:
-- `--no-result`: omit result blocks from the cassette (smaller files, cleaner diffs)
-
-### `ocarina play <cassette.yaml>`
-
-Executes each track in order against the live server. No LLM involved. Keys from `echo:` feed into subsequent tracks. Exits non-zero if any `expect:` assertion fails.
-
-```bash
-ocarina play examples/github-investigation.yaml
-ocarina play examples/mcp-smoke-test.yaml   # has assertions, works as a CI test
-ocarina play examples/github-investigation.yaml --dry-run
+```yaml
+server: github
 ```
 
-Flags:
-- `--dry-run`: print tracks without executing them
-
-### `ocarina compose <command> [args...]`
-
-Connects to a server and lists tools with their schemas. Servers that declare side-effect hints show badges: `[readonly]`, `[destructive]`, `[idempotent]`.
-
 ```bash
-ocarina compose uvx mcp-server-fetch
-ocarina compose uvx mcp-server-sqlite --db-path /tmp/db.sqlite
-ocarina compose npx -y @modelcontextprotocol/server-filesystem /tmp
-ocarina compose --yaml uvx mcp-server-fetch   # emit a skeleton cassette
+ocarina hum github -- list_commits owner=pytorch repo=pytorch per_page=1
 ```
+
+See `mcp.json.example` for a starter template. Ocarina also discovers servers from the Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`).
 
 ## Examples
 
-The `examples/` directory has working cassettes for:
+Working rondos for 50+ MCP servers are in [`examples/`](examples/). A selection:
 
-| File | Server | What it shows |
+| Rondo | Server | What it does |
 |---|---|---|
-| `fetch-demo.yaml` | `uvx mcp-server-fetch` | Basic fetch and content capture |
-| `github-investigation.yaml` | `@modelcontextprotocol/server-github` | `echo:` + `grab:` to chain API calls |
-| `sqlite-migration.yaml` | `uvx mcp-server-sqlite` | Stateful migration, seed, and query workflow |
-| `git-repo-audit.yaml` | `uvx mcp-server-git` | Local repo audit: log, status, diff, branches |
-| `mcp-smoke-test.yaml` | `@modelcontextprotocol/server-everything` | `expect:` assertions, usable as a CI smoke test |
-| `sequential-thinking-demo.yaml` | `@modelcontextprotocol/server-sequential-thinking` | Multi-step reasoning chain as a recorded cassette |
-| `knowledge-graph-demo.yaml` | `@modelcontextprotocol/server-memory` | Create, relate, search, and delete lifecycle |
-| `puppeteer-scrape.yaml` | `@modelcontextprotocol/server-puppeteer` | Headless browser: navigate, evaluate JS, screenshot |
-| `time-zones.yaml` | `uvx mcp-server-time` | Parameterized timezone conversions |
+| `sqlite/data-quality-audit.yaml` | `mcp-server-sqlite` | Schema check, row counts, referential integrity assertions |
+| `github-investigation/repo-health.yaml` | `github-mcp-server` | Commit history, open issues, contributor activity |
+| `github-investigation/resource-audit.yaml` | `github-mcp-server` | Read repo files directly via `resource:` steps |
+| `postgres/query-workflow.yaml` | `mcp-server-postgres` | Multi-step query and result validation |
+| `docker/docker.yaml` | `mcp-server-docker` | Container list, image audit, resource usage check |
+| `elasticsearch/cluster-search.yaml` | `mcp-server-elasticsearch` | Index health, search, document count assertions |
+| `playwright-browser/page-audit.yaml` | `mcp-server-playwright` | Navigate, extract content, assert on page state |
+| `yahoo-finance/portfolio-health.yaml` | `mcp-yahoo-finance` | Price fetch, income statements, parameterized by ticker |
+
+See [docs/tested-servers.md](docs/tested-servers.md) for the full list.
 
 ## Use in CI
 
+`play` exits 0 if all `expect:` assertions pass, non-zero otherwise. Drop a rondo into any CI pipeline:
+
 ```yaml
-# .github/workflows/mcp-test.yml
-- name: Run MCP smoke tests
-  run: ocarina play examples/mcp-smoke-test.yaml
+- name: Database health check
+  run: ocarina play rondos/db-audit.yaml
 ```
-
-`play` exits 0 if all expectations pass, non-zero otherwise. No API keys needed.
-
-## What ocarina is not
-
-Ocarina does not score LLM outputs, compare models, or track token costs. It connects to the real MCP server on every `play` run, so a broken server breaks the replay. It has no test runner, no discovery, and no report format beyond stdout and exit codes.
-
-## Development
-
-```bash
-git clone https://github.com/msradam/ocarina
-cd ocarina
-go build -o ~/bin/ocarina .
-go test ./...
-```
-
-Validation: `gofmt`, `go vet`, `staticcheck`, `golangci-lint`, `gosec`, `govulncheck`.
 
 ## License
 
-MIT
-
----
-
-[Whistle](https://thenounproject.com/browse/icons/term/whistle/) icon by Alessio Capponi from [Noun Project](https://thenounproject.com) (CC BY 3.0)
+MIT. [Whistle](https://thenounproject.com/browse/icons/term/whistle/) icon by Alessio Capponi from [Noun Project](https://thenounproject.com) (CC BY 3.0).

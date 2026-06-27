@@ -1,15 +1,26 @@
 package interp
 
-import "strings"
+import (
+	"os"
+	"regexp"
+	"strings"
+)
+
+var envRe = regexp.MustCompile(`\{\{env\.([^}]+)\}\}`)
 
 // Apply recursively replaces {{key}} in all string values of val using vars.
+// {{env.NAME}} is resolved directly from the calling process environment.
 // Non-string leaves (int, bool, float64) pass through unchanged.
 func Apply(val any, vars map[string]string) any {
-	if val == nil || len(vars) == 0 {
+	if val == nil {
 		return val
 	}
 	switch v := val.(type) {
 	case string:
+		// resolve {{env.X}} from the process environment first
+		v = envRe.ReplaceAllStringFunc(v, func(m string) string {
+			return os.Getenv(envRe.FindStringSubmatch(m)[1])
+		})
 		for k, replacement := range vars {
 			v = strings.ReplaceAll(v, "{{"+k+"}}", replacement)
 		}
@@ -33,9 +44,6 @@ func Apply(val any, vars map[string]string) any {
 
 // Strings applies vars to each element of a string slice.
 func Strings(ss []string, vars map[string]string) []string {
-	if len(vars) == 0 {
-		return ss
-	}
 	out := make([]string, len(ss))
 	for i, s := range ss {
 		out[i] = Apply(s, vars).(string)

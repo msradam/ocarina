@@ -1,0 +1,31 @@
+# built binaries
+ocarina
+ocarina-arm64
+ocarina-arm64-nocgo
+dist/
+
+# playwright session captures
+.playwright-mcp/
+
+# OS
+.DS_Store
+._*
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Go
+*.test
+*.out
+
+# local server config (may contain credentials — use ~/.mcp.json for personal config)
+.mcp.json
+.env
+
+# internal strategy docs
+COMPETITION.md
+POSITIONING.md

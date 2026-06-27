@@ -1,0 +1,45 @@
+keys:
+  github_token: "{{env.GITHUB_TOKEN}}"
+  owner: msradam
+  repo: ocarina
+
+server:
+  command: npx
+  args: ["-y", "@modelcontextprotocol/server-github"]
+  env:
+    GITHUB_PERSONAL_ACCESS_TOKEN: "{{github_token}}"
+
+rondo:
+  - name: read go.mod
+    resource: "repo://{{owner}}/{{repo}}/contents/go.mod"
+    echo: gomod
+    expect:
+      contains: module
+
+  - name: read LICENSE
+    resource: "repo://{{owner}}/{{repo}}/contents/LICENSE"
+    expect:
+      contains: MIT
+
+  - name: read README
+    resource: "repo://{{owner}}/{{repo}}/contents/README.md"
+    echo: readme
+
+  - name: check for ci workflow
+    resource: "repo://{{owner}}/{{repo}}/contents/.github/workflows/ci.yml"
+    ignore_errors: true
+    echo: ci_config
+
+  - name: recent commits on main
+    tool: list_commits
+    args:
+      owner: "{{owner}}"
+      repo: "{{repo}}"
+      sha: main
+    grab: ".0.sha"
+    echo: latest_sha
+
+  - name: read tree at latest commit
+    resource: "repo://{{owner}}/{{repo}}/git/trees/{{latest_sha}}"
+    expect:
+      contains: go.mod

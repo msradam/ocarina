@@ -38,10 +38,15 @@ and writes a cassette when the session ends.`,
 		if len(rest) == 0 {
 			return fmt.Errorf("missing server command")
 		}
-		serverCmd := rest[0]
-		serverArgs := rest[1:]
+		serverCmd, serverArgs, serverEnv, err := resolveServerArgs(rest)
+		if err != nil {
+			return err
+		}
 
 		srv := exec.Command(serverCmd, serverArgs...) //#nosec G204 -- ocarina's purpose is launching user-specified MCP servers
+		for k, v := range serverEnv {
+			srv.Env = append(srv.Env, k+"="+v)
+		}
 		serverStdin, err := srv.StdinPipe()
 		if err != nil {
 			return err
@@ -61,20 +66,17 @@ and writes a cassette when the session ends.`,
 		var wg sync.WaitGroup
 		wg.Add(2)
 
-		// host → server
 		go func() {
 			defer wg.Done()
 			ic.TeeClientToServer(serverStdin, os.Stdin)
 			_ = serverStdin.Close() //#nosec G104 -- close on shutdown, error irrelevant
 		}()
 
-		// server → host
 		go func() {
 			defer wg.Done()
 			ic.TeeServerToClient(os.Stdout, serverStdout)
 		}()
 
-		// drain recorded tool calls
 		var recorded []proxy.RecordedCall
 		doneDrain := make(chan struct{})
 		go func() {
@@ -84,7 +86,6 @@ and writes a cassette when the session ends.`,
 			close(doneDrain)
 		}()
 
-		// drain recorded sampling/LLM rounds
 		var sampled []proxy.SampledCall
 		doneSampleDrain := make(chan struct{})
 		go func() {
@@ -120,7 +121,7 @@ and writes a cassette when the session ends.`,
 			if toolCount[rc.Tool] > 1 {
 				name = fmt.Sprintf("%s_%d", rc.Tool, toolIdx[rc.Tool])
 			}
-			track := playbook.Track{
+			step := playbook.Step{
 				Name: name,
 				Tool: rc.Tool,
 				Args: rc.Args,
@@ -134,14 +135,14 @@ and writes a cassette when the session ends.`,
 				}
 				if err := json.Unmarshal(rc.Result, &result); err == nil {
 					for _, item := range result.Content {
-						track.Result = append(track.Result, playbook.ResultItem{
+						step.Result = append(step.Result, playbook.ResultItem{
 							Type: item.Type,
 							Text: item.Text,
 						})
 					}
 				}
 			}
-			c.Rondo = append(c.Rondo, track)
+			c.Rondo = append(c.Rondo, step)
 		}
 
 		for _, sc := range sampled {
@@ -151,7 +152,7 @@ and writes a cassette when the session ends.`,
 		if err := playbook.Save(output, c); err != nil {
 			return fmt.Errorf("save cassette: %w", err)
 		}
-		msg := fmt.Sprintf("ocarina: recorded %d track(s)", len(c.Rondo))
+		msg := fmt.Sprintf("ocarina: recorded %d step(s)", len(c.Rondo))
 		if len(c.LLM) > 0 {
 			msg += fmt.Sprintf(", %d llm round(s)", len(c.LLM))
 		}
