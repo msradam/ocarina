@@ -57,16 +57,15 @@ rondo:
 	if !f.MultiServer() {
 		t.Fatal("expected MultiServer true")
 	}
-	// step without server defaults to first
-	if key, _, err := f.ServerFor(f.Steps[0]); err != nil || key != "time" {
-		t.Fatalf("default ServerFor = %q, %v", key, err)
+	// step without server defaults to first; explicit server is honored
+	if got := f.StepServerKey(f.Steps[0]); got != "time" {
+		t.Fatalf("default StepServerKey = %q", got)
 	}
-	if key, _, err := f.ServerFor(f.Steps[1]); err != nil || key != "fetch" {
-		t.Fatalf("explicit ServerFor = %q, %v", key, err)
+	if got := f.StepServerKey(f.Steps[1]); got != "fetch" {
+		t.Fatalf("explicit StepServerKey = %q", got)
 	}
-	// undefined server is an error
-	if _, _, err := f.ServerFor(Step{Server: "nope"}); err == nil {
-		t.Fatal("expected error for undefined server")
+	if _, ok := f.Servers["nope"]; ok {
+		t.Fatal("undefined server should be absent from the map")
 	}
 }
 

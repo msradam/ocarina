@@ -36,16 +36,6 @@ func (f *File) StepServerKey(step Step) string {
 	return f.DefaultServerKey()
 }
 
-// ServerFor resolves which server a step targets and returns its key and config.
-func (f *File) ServerFor(step Step) (string, Server, error) {
-	key := f.StepServerKey(step)
-	s, ok := f.Servers[key]
-	if !ok {
-		return key, Server{}, fmt.Errorf("step references server %q, which is not defined in the servers map", key)
-	}
-	return key, s, nil
-}
-
 // MultiServer reports whether more than one server is in play, so callers can
 // namespace tool names (e.g. time.get_current_time) in output.
 func (f *File) MultiServer() bool {
