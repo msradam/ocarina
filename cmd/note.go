@@ -26,6 +26,10 @@ Example:
 	Args:               cobra.MinimumNArgs(1),
 	DisableFlagParsing: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) > 0 && (args[0] == "--help" || args[0] == "-h") {
+			return cmd.Help()
+		}
+
 		sep := -1
 		for i, a := range args {
 			if a == "--" {

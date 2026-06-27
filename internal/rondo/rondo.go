@@ -54,13 +54,13 @@ type Step struct {
 }
 
 // RetryConfig mirrors Ansible's retry/until/delay pattern.
-// Attempts is the number of retries after the first attempt (total = 1 + Attempts).
-// When Until is set but Attempts is 0, defaults to 3 retries (4 total) matching Ansible.
+// Retries is the number of additional attempts after the first (total = 1 + Retries).
+// When Until is set but Retries is 0, defaults to 3 retries (4 total) matching Ansible.
 // Delay defaults to 5s when unset.
 type RetryConfig struct {
-	Attempts int    `yaml:"attempts,omitempty"`
-	Delay    string `yaml:"delay,omitempty"`
-	Until    string `yaml:"until,omitempty"`
+	Retries int    `yaml:"retries,omitempty"`
+	Delay   string `yaml:"delay,omitempty"`
+	Until   string `yaml:"until,omitempty"`
 }
 
 // Expect declares assertions checked after a step runs. play exits non-zero if any fail.

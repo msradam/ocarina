@@ -69,6 +69,9 @@ Example:
 		}
 		serverArgs := interp.Strings(c.Server.Args, notes)
 		serverEnv := interp.StringMap(c.Server.Env, notes)
+		if c.Server.Command == "" {
+			return fmt.Errorf("rondo is missing a server: block")
+		}
 		sess, err := mcpclient.Connect(ctx, c.Server.Command, serverArgs, serverEnv)
 		if err != nil {
 			return fmt.Errorf("connect: %w", err)
@@ -158,6 +161,17 @@ Example:
 					continue
 				}
 
+				// Tool-level errors (isError:true) are failures by default.
+				// Opt out with ignore_errors: true or expect: is_error: true.
+				if isToolError && !step.IgnoreErrors {
+					expectsError := step.Expect != nil && step.Expect.IsError != nil && *step.Expect.IsError
+					if !expectsError {
+						fmt.Fprintf(os.Stderr, "    %s %s\n\n", red("error:"), truncate(output, 200))
+						failures = append(failures, fmt.Sprintf("step %q: tool returned an error", name))
+						continue
+					}
+				}
+
 				captured := output
 				if step.Grab != "" {
 					extracted, grabErr := interp.Grab(captured, step.Grab)
@@ -208,10 +222,10 @@ func runWithRetry(ctx context.Context, sess *mcp.ClientSession, step rondo.Step,
 	}
 
 	totalAttempts := 1
-	if r.Attempts > 0 {
-		totalAttempts = 1 + r.Attempts
+	if r.Retries > 0 {
+		totalAttempts = 1 + r.Retries
 	} else if r.Until != "" {
-		totalAttempts = 4 // Ansible default when until: is set but attempts: is omitted
+		totalAttempts = 4 // Ansible default when until: is set but retries: is omitted
 	}
 
 	delay := 5 * time.Second
@@ -446,7 +460,8 @@ func stepLabel(t rondo.Step) string {
 func dryRunDetail(t rondo.Step, notes map[string]string) string {
 	switch {
 	case t.Tool != "":
-		return fmt.Sprintf("tool=%s args=%v", t.Tool, t.Args)
+		resolved, _ := interp.Apply(t.Args, notes).(map[string]any)
+		return fmt.Sprintf("tool=%s args=%v", t.Tool, resolved)
 	case t.Resource != "":
 		return fmt.Sprintf("resource=%s", interp.Apply(t.Resource, notes).(string))
 	case t.ListResources != "":

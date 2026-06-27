@@ -51,6 +51,9 @@ Example:
 		}
 		serverArgs := interp.Strings(c.Server.Args, c.Keys)
 		serverEnv := interp.StringMap(c.Server.Env, c.Keys)
+		if c.Server.Command == "" {
+			return fmt.Errorf("rondo is missing a server: block")
+		}
 		sess, err := mcpclient.Connect(ctx, c.Server.Command, serverArgs, serverEnv)
 		if err != nil {
 			return fmt.Errorf("connect: %w", err)
@@ -107,6 +110,11 @@ Example:
 
 			var errs, warns []string
 
+			// step must have exactly one action
+			if step.Tool == "" && step.Resource == "" && step.ListResources == "" && step.Sleep == "" {
+				errs = append(errs, "step has no tool, resource, list_resources, or sleep field")
+			}
+
 			if step.Tool != "" {
 				entry, found := schemas[step.Tool]
 				if !found {
@@ -154,7 +162,7 @@ Example:
 					for _, m := range templateKeyRe.FindAllStringSubmatch(s, -1) {
 						key := m[1]
 						if !available[key] {
-							warns = append(warns, fmt.Sprintf("arg %q: {{%s}} not in keys and no prior step sets it via echo:", arg, key))
+							errs = append(errs, fmt.Sprintf("arg %q: {{%s}} not defined in keys: and no prior step sets it via echo:", arg, key))
 						}
 					}
 				}
@@ -165,7 +173,7 @@ Example:
 				for _, m := range templateKeyRe.FindAllStringSubmatch(step.Resource, -1) {
 					key := m[1]
 					if !available[key] {
-						warns = append(warns, fmt.Sprintf("resource URI: {{%s}} not defined", key))
+						errs = append(errs, fmt.Sprintf("resource URI: {{%s}} not defined in keys: and no prior step sets it via echo:", key))
 					}
 				}
 			}

@@ -9,10 +9,12 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "ocarina",
-	Short: "MCP cassette recorder and player",
-	Long: `ocarina records, composes, and plays back MCP tool call cassettes.
-
-Record a live session. Play it back without an LLM. Every tool call is a step in a rondo.`,
+	Short: "MCP rondo recorder and player",
+	Long:  `ocarina records and plays back MCP tool call rondos. Record a live session, play it back without an LLM.`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true // don't dump usage text on runtime failures
+		return nil
+	},
 }
 
 func Execute() {
