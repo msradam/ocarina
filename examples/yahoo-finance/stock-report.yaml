@@ -1,4 +1,4 @@
-keys:
+vars:
   ticker: AAPL
 
 server:

@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatih/color"
 	jschema "github.com/google/jsonschema-go/jsonschema"
+	"github.com/msradam/ocarina/internal/condition"
 	"github.com/msradam/ocarina/internal/interp"
 	"github.com/msradam/ocarina/internal/mcpclient"
 	"github.com/msradam/ocarina/internal/playbook"
@@ -48,8 +49,8 @@ Example:
 		if err := resolveServer(&c.Server); err != nil {
 			return err
 		}
-		serverArgs := interp.Strings(c.Server.Args, c.Keys)
-		serverEnv := interp.StringMap(c.Server.Env, c.Keys)
+		serverArgs := interp.Strings(c.Server.Args, c.Vars)
+		serverEnv := interp.StringMap(c.Server.Env, c.Vars)
 		sess, err := mcpclient.Connect(ctx, c.Server.Command, serverArgs, serverEnv)
 		if err != nil {
 			return fmt.Errorf("connect: %w", err)
@@ -88,9 +89,9 @@ Example:
 			schemas[t.Name] = entry
 		}
 
-		// data-flow: keys available via keys + prior echo: fields
+		// data-flow: vars available via vars: + prior register: fields
 		available := make(map[string]bool)
-		for k := range c.Keys {
+		for k := range c.Vars {
 			available[k] = true
 		}
 
@@ -170,8 +171,25 @@ Example:
 			}
 
 			// list_resources: stores URIs for loop:
-			if step.ListResources != "" && step.Echo != "" {
-				available[step.Echo] = true
+			if step.ListResources != "" && step.Register != "" {
+				available[step.Register] = true
+			}
+
+			// CEL syntax checks (parse-only; variables not known at validate time)
+			if step.When != "" {
+				if synErr := condition.CheckSyntax(step.When); synErr != nil {
+					errs = append(errs, fmt.Sprintf("when: %v", synErr))
+				}
+			}
+			if step.Retry != nil && step.Retry.Until != "" {
+				if synErr := condition.CheckSyntax(step.Retry.Until); synErr != nil {
+					errs = append(errs, fmt.Sprintf("retry.until: %v", synErr))
+				}
+			}
+			if step.Expect != nil && step.Expect.Rule != "" {
+				if synErr := condition.CheckSyntax(step.Expect.Rule); synErr != nil {
+					errs = append(errs, fmt.Sprintf("expect.rule: %v", synErr))
+				}
 			}
 
 			if len(errs) == 0 && len(warns) == 0 {
@@ -189,8 +207,8 @@ Example:
 			totalErrs += len(errs)
 			totalWarns += len(warns)
 
-			if step.Echo != "" {
-				available[step.Echo] = true
+			if step.Register != "" {
+				available[step.Register] = true
 			}
 		}
 

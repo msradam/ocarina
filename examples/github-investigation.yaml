@@ -1,7 +1,7 @@
 # A reusable repo investigation cassette.
 # Swap notes.owner and notes.repo to investigate any public GitHub repo.
 
-keys:
+vars:
   owner: modelcontextprotocol
   repo: go-sdk
 
@@ -16,7 +16,7 @@ rondo:
       owner: "{{owner}}"
       repo: "{{repo}}"
       per_page: 5
-    echo: commits_json
+    register: commits_json
     grab: ".0.sha"        # extract first commit SHA from the JSON array
     # notes.commits_json now holds just the SHA string
 

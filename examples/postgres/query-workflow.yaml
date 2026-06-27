@@ -1,4 +1,4 @@
-keys:
+vars:
   conn: postgresql://postgres:testpass@localhost:5432/testdb
 
 server:

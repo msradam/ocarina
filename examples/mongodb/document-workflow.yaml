@@ -1,4 +1,4 @@
-keys:
+vars:
   db: testdb
   collection: products
 

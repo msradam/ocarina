@@ -1,4 +1,4 @@
-keys:
+vars:
   source: |
     # Hello World
 

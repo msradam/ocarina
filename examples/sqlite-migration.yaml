@@ -5,7 +5,7 @@
 #
 # Shows: stateful multi-track workflows where each track builds on the last
 
-keys:
+vars:
   db: /tmp/ocarina-demo.db
 
 server:

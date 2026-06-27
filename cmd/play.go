@@ -13,6 +13,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/msradam/ocarina/internal/condition"
 	"github.com/msradam/ocarina/internal/interp"
 	"github.com/msradam/ocarina/internal/mcpclient"
 	"github.com/msradam/ocarina/internal/playbook"
@@ -46,8 +47,8 @@ Example:
 			return fmt.Errorf("load rondo: %w", err)
 		}
 
-		notes := make(map[string]string, len(c.Keys))
-		for k, v := range c.Keys {
+		notes := make(map[string]string, len(c.Vars))
+		for k, v := range c.Vars {
 			notes[k] = v
 		}
 		// -e key=value overrides rondo keys
@@ -116,12 +117,36 @@ Example:
 				}
 				fmt.Fprintf(os.Stdout, "%s %s\n", boldCyan("==>"), fmt.Sprintf("%s (%s)", name, label))
 
+				if step.When != "" {
+					ok, evalErr := condition.EvalBool(step.When, iterNotes, "")
+					if evalErr != nil {
+						fmt.Fprintf(os.Stderr, "    %s when: %v\n\n", red("error:"), evalErr)
+						failures = append(failures, fmt.Sprintf("step %q when: %v", name, evalErr))
+						continue
+					}
+					if !ok {
+						fmt.Fprintf(os.Stdout, "    %s\n\n", yellowPlay("skipped"))
+						continue
+					}
+				}
+
 				if dryRun {
 					fmt.Fprintf(os.Stdout, "    [dry-run] %s\n\n", dryRunDetail(step, iterNotes))
 					continue
 				}
 
-				output, isToolError, dispatchErr := dispatchStep(ctx, sess, step, iterNotes)
+				stepCtx := ctx
+				var cancelFn context.CancelFunc
+				if step.Timeout != "" {
+					if d, parseErr := time.ParseDuration(step.Timeout); parseErr == nil {
+						stepCtx, cancelFn = context.WithTimeout(ctx, d)
+					}
+				}
+
+				output, isToolError, dispatchErr := runWithRetry(stepCtx, sess, step, iterNotes)
+				if cancelFn != nil {
+					cancelFn()
+				}
 				if dispatchErr != nil {
 					msg := fmt.Sprintf("    %s %v\n\n", red("error:"), dispatchErr)
 					if step.IgnoreErrors {
@@ -149,8 +174,8 @@ Example:
 				}
 				fmt.Fprintf(os.Stdout, "%s\n", colorOutput(displayed))
 
-				if step.Echo != "" {
-					notes[step.Echo] = captured
+				if step.Register != "" {
+					notes[step.Register] = captured
 				}
 
 				if step.Expect != nil {
@@ -172,6 +197,67 @@ Example:
 		}
 		return nil
 	},
+}
+
+// runWithRetry wraps dispatchStep with Ansible-faithful retry/until semantics.
+// When retry: is nil, it delegates directly with no overhead.
+func runWithRetry(ctx context.Context, sess *mcp.ClientSession, step playbook.Step, notes map[string]string) (string, bool, error) {
+	r := step.Retry
+	if r == nil {
+		return dispatchStep(ctx, sess, step, notes)
+	}
+
+	totalAttempts := 1
+	if r.Attempts > 0 {
+		totalAttempts = 1 + r.Attempts
+	} else if r.Until != "" {
+		totalAttempts = 4 // Ansible default when until: is set but attempts: is omitted
+	}
+
+	delay := 5 * time.Second
+	if r.Delay != "" {
+		if d, err := time.ParseDuration(r.Delay); err == nil && d > 0 {
+			delay = d
+		}
+	}
+
+	var lastOutput string
+	var lastIsErr bool
+	var lastErr error
+
+	for attempt := 1; attempt <= totalAttempts; attempt++ {
+		lastOutput, lastIsErr, lastErr = dispatchStep(ctx, sess, step, notes)
+
+		if r.Until != "" {
+			passed, evalErr := condition.EvalBool(r.Until, notes, lastOutput)
+			if evalErr != nil {
+				return lastOutput, lastIsErr, fmt.Errorf("retry until: %w", evalErr)
+			}
+			if passed {
+				return lastOutput, lastIsErr, lastErr
+			}
+		} else if lastErr == nil && !lastIsErr {
+			return lastOutput, lastIsErr, lastErr
+		}
+
+		if attempt < totalAttempts {
+			fmt.Fprintf(os.Stderr, "    retrying (%d/%d in %s)...\n", attempt+1, totalAttempts, delay)
+			select {
+			case <-ctx.Done():
+				return lastOutput, lastIsErr, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+	}
+
+	if lastErr == nil {
+		if r.Until != "" {
+			lastErr = fmt.Errorf("retries exhausted: %q never matched", r.Until)
+		} else {
+			lastErr = fmt.Errorf("retries exhausted after %d attempt(s)", totalAttempts)
+		}
+	}
+	return lastOutput, lastIsErr, lastErr
 }
 
 // isToolError is true when the server returned isError:true on a tool call.
@@ -324,6 +410,20 @@ func checkExpect(e *playbook.Expect, output string, isToolError bool, notes map[
 			return fmt.Sprintf("expected is_error=%v, got %v", *e.IsError, isToolError)
 		}
 		fmt.Fprintf(os.Stdout, "    %s is_error=%v\n", green("PASS:"), *e.IsError)
+	}
+	if e.Rule != "" {
+		passed, evalErr := condition.EvalBool(e.Rule, notes, output)
+		if evalErr != nil {
+			return fmt.Sprintf("expect.rule eval: %v", evalErr)
+		}
+		if !passed {
+			msg := e.Message
+			if msg == "" {
+				msg = fmt.Sprintf("rule %q was false", e.Rule)
+			}
+			return msg
+		}
+		fmt.Fprintf(os.Stdout, "    %s rule %q\n", green("PASS:"), e.Rule)
 	}
 	return ""
 }

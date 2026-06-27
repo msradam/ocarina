@@ -1,4 +1,4 @@
-keys:
+vars:
   principal: "10000"
   rate: "0.07"
   years: "10"
@@ -13,27 +13,27 @@ rondo:
     args:
       a: "{{principal}}"
       b: "{{rate}}"
-    echo: annual_interest
+    register: annual_interest
 
   - name: value after year 1
     tool: sum
     args:
       a: "{{principal}}"
       b: "{{annual_interest}}"
-    echo: year1
+    register: year1
 
   - name: interest on year 1 balance
     tool: multiply
     args:
       a: "{{year1}}"
       b: "{{rate}}"
-    echo: year1_interest
+    register: year1_interest
 
   - name: value after year 2
     tool: sum
     args:
       a: "{{year1}}"
       b: "{{year1_interest}}"
-    echo: year2
+    register: year2
     expect:
       contains: "11449"

@@ -1,4 +1,4 @@
-keys:
+vars:
   target_url: https://example.com
 
 server:

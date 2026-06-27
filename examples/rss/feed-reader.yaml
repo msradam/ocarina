@@ -1,4 +1,4 @@
-keys:
+vars:
   feed_url: https://hnrss.org/frontpage
 
 server:

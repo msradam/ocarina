@@ -18,7 +18,7 @@ rondo:
     tool: echo
     args:
       message: "ocarina smoke test"
-    echo: echo_result
+    register: echo_result
     expect:
       contains: "ocarina smoke test"
 
@@ -27,7 +27,7 @@ rondo:
     args:
       a: 17
       b: 25
-    echo: sum_result
+    register: sum_result
     expect:
       contains: "42"
 

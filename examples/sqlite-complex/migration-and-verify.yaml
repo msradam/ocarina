@@ -9,7 +9,7 @@
 # The echo chain (tracks 8 -> 12) captures a count snapshot and
 # verifies it is unchanged after all read operations.
 
-keys:
+vars:
   db: /tmp/ocarina-test-complex.db
 
 server:
@@ -97,7 +97,7 @@ rondo:
     tool: read_query
     args:
       query: "SELECT COUNT(*) AS total_orders FROM orders"
-    echo: order_count_snapshot
+    register: order_count_snapshot
 
   - name: revenue by product category
     tool: read_query

@@ -1,4 +1,4 @@
-keys:
+vars:
   file: /tmp/sales.csv
 
 server:

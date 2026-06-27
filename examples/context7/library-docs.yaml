@@ -1,4 +1,4 @@
-keys:
+vars:
   library: react
 
 server:
@@ -10,7 +10,7 @@ rondo:
     tool: resolve-library-id
     args:
       libraryName: "{{library}}"
-    echo: library_id
+    register: library_id
     expect:
       contains: react
 

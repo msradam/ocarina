@@ -1,4 +1,4 @@
-keys: {}
+vars: {}
 
 server:
   command: uvx
@@ -10,7 +10,7 @@ rondo:
     args:
       story_type: top
       num_stories: 5
-    echo: top_stories_json
+    register: top_stories_json
 
   - name: best stories right now
     tool: get_stories

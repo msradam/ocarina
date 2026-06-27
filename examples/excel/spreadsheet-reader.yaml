@@ -1,4 +1,4 @@
-keys:
+vars:
   file: /path/to/workbook.xlsx
 
 server:

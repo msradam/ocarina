@@ -1,4 +1,4 @@
-keys:
+vars:
   pdf_path: /tmp/sample.pdf
 
 server:

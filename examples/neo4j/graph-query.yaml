@@ -1,4 +1,4 @@
-keys:
+vars:
   neo4j_uri: bolt://localhost:7687
 
 server:

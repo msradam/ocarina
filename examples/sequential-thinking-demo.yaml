@@ -7,7 +7,7 @@
 # expect: assertions on the final synthesis step, and how a "thinking process"
 # becomes a replayable artifact.
 
-keys:
+vars:
   problem: "How should ocarina handle MCP servers that return non-JSON prose responses when grab: is used?"
 
 server:

@@ -1,4 +1,4 @@
-keys:
+vars:
   prefix: "ocarina"
 
 server:

@@ -1,4 +1,4 @@
-keys: {}
+vars: {}
 server:
   command: uvx
   args: ["crossref-mcp"]

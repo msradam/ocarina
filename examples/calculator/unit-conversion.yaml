@@ -1,4 +1,4 @@
-keys:
+vars:
   miles: "26.2188"
 
 server:
@@ -10,7 +10,7 @@ rondo:
     tool: calculate
     args:
       expression: "{{miles}} * 1.60934"
-    echo: km
+    register: km
     expect:
       contains: "42"
 
@@ -18,7 +18,7 @@ rondo:
     tool: calculate
     args:
       expression: "{{km}} * 1000"
-    echo: meters
+    register: meters
     expect:
       contains: "42"
 
