@@ -1,0 +1,19 @@
+name: Ocarina MCP replay
+description: Run an Ocarina rondo against an MCP server in CI
+inputs:
+  rondo:
+    description: Path to the rondo YAML file
+    required: true
+  version:
+    description: Ocarina version to install
+    default: latest
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v5
+      with:
+        go-version: stable
+    - run: go install github.com/msradam/ocarina@${{ inputs.version }}
+      shell: bash
+    - run: ocarina play ${{ inputs.rondo }}
+      shell: bash

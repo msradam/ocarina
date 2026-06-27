@@ -1,0 +1,76 @@
+keys:
+  intent: "Ocarina deterministic Blender demo"
+
+server:
+  command: uvx
+  args: [blender-mcp]
+
+rondo:
+  - name: inspect the starting scene
+    tool: get_scene_info
+    args:
+      user_prompt: "{{intent}}"
+
+  - name: clear the default scene
+    tool: execute_blender_code
+    args:
+      code: |
+        import bpy
+        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.delete()
+  - sleep: 0.8s
+
+  - name: lay down a ground plane
+    tool: execute_blender_code
+    args:
+      code: |
+        import bpy
+        bpy.ops.mesh.primitive_plane_add(size=20, location=(0, 0, 0))
+  - sleep: 0.8s
+
+  - name: drop a cube
+    tool: execute_blender_code
+    args:
+      code: |
+        import bpy
+        bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))
+  - sleep: 0.8s
+
+  - name: stack a sphere on top
+    tool: execute_blender_code
+    args:
+      code: |
+        import bpy
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, location=(0, 0, 3))
+  - sleep: 0.8s
+
+  - name: add a cone beside it
+    tool: execute_blender_code
+    args:
+      code: |
+        import bpy
+        bpy.ops.mesh.primitive_cone_add(radius1=1, depth=2, location=(3.5, 0, 1))
+  - sleep: 0.8s
+
+  - name: place a camera and a sun
+    tool: execute_blender_code
+    args:
+      code: |
+        import bpy
+        bpy.ops.object.camera_add(location=(12, -12, 8), rotation=(1.1, 0, 0.785))
+        bpy.context.scene.camera = bpy.context.object
+        bpy.ops.object.light_add(type='SUN', location=(6, -6, 12))
+  - sleep: 0.8s
+
+  - name: confirm every object landed
+    tool: get_scene_info
+    args:
+      user_prompt: "{{intent}}"
+    expect:
+      contains: "Sphere"
+
+  - name: capture the viewport
+    tool: get_viewport_screenshot
+    args:
+      max_size: 800
+      user_prompt: "{{intent}}"

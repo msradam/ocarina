@@ -4,9 +4,19 @@
     <img src="assets/whistle-light.svg" alt="Ocarina" width="80">
   </picture>
   <h1>Ocarina</h1>
+  <p><strong>An automation framework for MCP servers.</strong> Write a YAML script, replay it deterministically, no LLM in the loop.</p>
+
+  <a href="assets/blender-demo.mp4">
+    <img src="assets/blender-demo.gif" alt="An Ocarina rondo building a 3D scene in Blender, one step at a time" width="100%">
+  </a>
+  <p><sub>A rondo driving <a href="https://github.com/ahujasid/blender-mcp">blender-mcp</a>: lay down a plane, drop a cube, stack a sphere, add a cone, then verify the scene. Same YAML, same result, every run. No model involved. (Click for video.)</sub></p>
 </div>
 
-Ocarina is a YAML automation framework for [MCP](https://modelcontextprotocol.io) servers. Write a declarative script that calls MCP tools in sequence, asserts on results, and pipes values between steps. No LLM involved.
+The MCP ecosystem is already enormous: thousands of servers exposing real services through typed tools, readable resources, and schema-checked contracts, deployed and ready to call. Ocarina is an automation framework for all of it. Write a YAML script that drives tools across one or more servers, pipes values between steps, branches, loops, and retries, and runs the same way every time. No LLM in the loop, so every run is reproducible and costs nothing.
+
+These tools were built to be read by language models, and language models are trained on human language, so the tools read cleanly to people too. A server exposes named contracts like `get_issues` or `query_database`, not endpoints you wire up in code. Every server someone built for an AI assistant is one you can drive.
+
+What you write is a playbook: a portable artifact that captures an automation workflow over those servers, with MCP as the wire protocol. You can read it, review it in a pull request, version it, and run it anywhere the servers are reachable. Write it by hand or have an agent generate it. Either way it runs the same on every execution, with no sampling, no tokens, and nothing inferring between the file and the result.
 
 ![Ocarina docs output](assets/screenshot-docs.png)
 
@@ -87,6 +97,7 @@ rondo:
 
 | Field | Description |
 |---|---|
+| `server` | Which server to run this step against (a key in the `servers:` map); defaults to the only/first server |
 | `tool` | Tool name to call |
 | `resource` | Resource URI to read (`resources/read`) |
 | `list_resources` | Server prefix to list resources from; output is a JSON URI array |
@@ -102,6 +113,31 @@ rondo:
 | `tags` | Tag this step for `--tags` / `--skip-tags` filtering |
 
 `{{env.NAME}}` resolves from the process environment and works anywhere `{{key}}` does.
+
+Coming from Ansible? `tasks:` is accepted as an alias for `rondo:`, and `register:` as an alias for `echo:`.
+
+## Multiple servers
+
+A single rondo can talk to more than one server. Declare them under `servers:` and set `server:` on each step. Steps that omit `server:` use the first entry.
+
+```yaml
+servers:
+  time: {command: uvx, args: [mcp-server-time]}
+  fetch: {command: uvx, args: [-y, "@modelcontextprotocol/server-fetch"]}
+
+rondo:
+  - name: get time
+    server: time
+    tool: get_current_time
+    args: {timezone: UTC}
+
+  - name: fetch page
+    server: fetch
+    tool: fetch
+    args: {url: "https://example.com"}
+```
+
+Output and `diff` namespace tool names by server (`time.get_current_time`). The single `server:` block still works for one-server rondos.
 
 ## Commands
 
@@ -166,6 +202,16 @@ See [docs/tested-servers.md](docs/tested-servers.md) for the full list.
 - name: Database health check
   run: ocarina play rondos/db-audit.yaml
 ```
+
+A composite GitHub Action installs Ocarina and replays a rondo:
+
+```yaml
+- uses: msradam/ocarina@v1
+  with:
+    rondo: tests/mcp-smoke.yaml
+```
+
+See [`action.yml`](action.yml) and [`.github/workflows/example.yml`](.github/workflows/example.yml).
 
 ## License
 

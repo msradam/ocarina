@@ -1,0 +1,14 @@
+# Example workflow showing how to replay an Ocarina rondo in CI.
+# Copy this into your own repository's .github/workflows/ and point it at your rondo.
+name: MCP smoke test
+on:
+  push:
+  pull_request:
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msradam/ocarina@v1
+        with:
+          rondo: tests/mcp-smoke.yaml
