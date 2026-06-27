@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ocarina</title>
-  <meta name="description" content="Record an LLM's MCP tool calls to a YAML rondo. Replay them against the real server without an LLM.">
+  <meta name="description" content="Ocarina is an automation framework for MCP servers. Write YAML playbooks that drive tools and assert on results, deterministically, with no LLM.">
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/msradam/lokta-css@main/lokta.tokens.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/msradam/lokta-css@main/lokta.css">
@@ -43,6 +43,7 @@
       width: 28px;
       height: 28px;
       flex: none;
+      color: var(--viz-1);
     }
 
     .nav-section-label {
@@ -288,6 +289,7 @@
       <a class="lk-nav-item nav-sub-item" href="#diff">diff</a>
       <a class="lk-nav-item nav-sub-item" href="#hum">hum</a>
       <a class="lk-nav-item" href="#examples">Examples</a>
+      <a class="lk-nav-item" href="#showcases">Showcases</a>
       <a class="lk-nav-item" href="#ci">Use in CI</a>
       <a class="lk-nav-item" href="#scope">Scope</a>
 
@@ -343,7 +345,7 @@
         </svg>
 
         <h1 class="lk-display" style="margin:0 0 var(--space-3)">Ocarina</h1>
-        <p class="lk-lede" style="max-width:52ch;margin:0 0 var(--space-5)">When an LLM uses MCP tools, the tool calls are deterministic. The LLM is not. Ocarina records those calls to a YAML file and replays them against the real server, without the LLM.</p>
+        <p class="lk-lede" style="max-width:52ch;margin:0 0 var(--space-5)">Ocarina is an automation framework for MCP servers. Write a YAML playbook that drives tools across servers, pipes values between steps, and asserts on results, then run it the same way every time. No LLM in the loop.</p>
 
         <div class="lk-cluster" style="margin-bottom:var(--space-5)">
           <a class="lk-btn lk-btn-primary" href="#install">Get started</a>
@@ -375,7 +377,7 @@ ocarina play   session.yaml</code></pre>
       <div class="lk-running-head"><span class="lk-eyebrow">01</span><span class="lk-eyebrow">Why</span></div>
       <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">The reproducible part of an agentic system</h2>
 
-      <p class="lk-lede" style="max-width:60ch">MCP tool calls return the same output for the same inputs, regardless of which LLM issued them. Once you record a session, you can replay it in CI, check that the server still returns what you expect, and catch regressions without an API key.</p>
+      <p class="lk-lede" style="max-width:60ch">MCP tool calls return the same output for the same inputs, regardless of which LLM issued them. Write a playbook by hand or record one from a session, then replay it in CI to check the server still returns what you expect and catch regressions, with no API key.</p>
 
       <div class="lk-measure" style="margin:var(--space-5) 0"><span class="lk-measure-line" style="width:60px"></span><span class="lk-measure-gap"></span><span class="lk-measure-hatch"></span></div>
 
@@ -701,9 +703,40 @@ ocarina hum npx -y @modelcontextprotocol/server-github -- list_commits owner=pyt
       </table>
     </section>
 
+    <!-- Showcases -->
+    <section class="docs-section" id="showcases">
+      <div class="lk-running-head"><span class="lk-eyebrow">06</span><span class="lk-eyebrow">Showcases</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Showcases</h2>
+      <p style="color:var(--text-body);margin-bottom:var(--space-4)">Standalone repositories you can clone and run, each a real working environment for a different MCP server.</p>
+
+      <table class="ex-table">
+        <thead>
+          <tr><th>Repository</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/duckdb-mcp-ocarina" target="_blank" rel="noopener">duckdb-mcp-ocarina</a></td>
+            <td>Data integrity, migration, and regression tests against a DuckDB database. Clone and run, no credentials.</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/chrome-devtools-mcp-ocarina" target="_blank" rel="noopener">chrome-devtools-mcp-ocarina</a></td>
+            <td>Web health checks through Chrome DevTools MCP. Fail on a console error or a failed request.</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/github-mcp-ocarina" target="_blank" rel="noopener">github-mcp-ocarina</a></td>
+            <td>Repo governance as tests through the GitHub MCP server: a license, docs, and history.</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/blender-mcp-ocarina" target="_blank" rel="noopener">blender-mcp-ocarina</a></td>
+            <td>Automate and snapshot-test a 3D scene in Blender, an app with no external API at all.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
     <!-- CI -->
     <section class="docs-section" id="ci">
-      <div class="lk-running-head"><span class="lk-eyebrow">06</span><span class="lk-eyebrow">Use in CI</span></div>
+      <div class="lk-running-head"><span class="lk-eyebrow">07</span><span class="lk-eyebrow">Use in CI</span></div>
       <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Use in CI</h2>
 
       <p style="color:var(--text-body);margin-bottom:var(--space-4)"><code class="lk-code-inline">play</code> exits 0 if all expectations pass, non-zero otherwise. No API keys needed.</p>
@@ -728,7 +761,7 @@ jobs:
 
     <!-- Scope -->
     <section class="docs-section" id="scope">
-      <div class="lk-running-head"><span class="lk-eyebrow">07</span><span class="lk-eyebrow">Scope</span></div>
+      <div class="lk-running-head"><span class="lk-eyebrow">08</span><span class="lk-eyebrow">Scope</span></div>
       <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">What MCP makes easy, and what it does not yet</h2>
 
       <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">Ocarina works because MCP gives every server the same shape: named tools with typed arguments, reachable over one protocol. Learn the grammar once and you can drive a time server, a GitHub server, a Postgres database, and a 3D modeling app with the same YAML. You point Ocarina at a server, fill in the calls, and it runs them the same way on every execution. That part is solid today.</p>
