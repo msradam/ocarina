@@ -15,7 +15,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/msradam/ocarina/internal/condition"
 	"github.com/msradam/ocarina/internal/interp"
-	"github.com/msradam/ocarina/internal/mcpclient"
 	"github.com/msradam/ocarina/internal/rondo"
 	"github.com/spf13/cobra"
 )
@@ -84,13 +83,7 @@ Example:
 			if !ok {
 				return nil, fmt.Errorf("step references server %q, which is not defined in the servers map", key)
 			}
-			if err := resolveServer(&srv); err != nil {
-				return nil, err
-			}
-			if srv.Command == "" {
-				return nil, fmt.Errorf("server %q has no command", key)
-			}
-			s, err := mcpclient.Connect(ctx, srv.Command, interp.Strings(srv.Args, notes), interp.StringMap(srv.Env, notes))
+			s, err := connectServer(ctx, srv, notes)
 			if err != nil {
 				return nil, fmt.Errorf("connect %q: %w", key, err)
 			}
@@ -419,6 +412,13 @@ func callTool(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, not
 			}
 		default:
 			parts = append(parts, fmt.Sprintf("[%T]", content))
+		}
+	}
+	// Prefer structured output when the server provides it: grab/echo/expect
+	// then operate on typed JSON instead of parsing the text block.
+	if result.StructuredContent != nil {
+		if b, err := json.Marshal(result.StructuredContent); err == nil {
+			return string(b), result.IsError, nil
 		}
 	}
 	return strings.Join(parts, "\n"), result.IsError, nil

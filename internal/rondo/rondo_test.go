@@ -69,3 +69,24 @@ rondo:
 		t.Fatal("expected error for undefined server")
 	}
 }
+
+func TestLoadHTTPServer(t *testing.T) {
+	f := loadString(t, `
+server:
+  url: https://example.com/mcp
+  headers:
+    Authorization: "Bearer {{env.TOKEN}}"
+rondo:
+  - tool: get_me
+`)
+	s, ok := f.Servers["default"]
+	if !ok {
+		t.Fatalf("url-only server not wrapped under default: %+v", f.Servers)
+	}
+	if !s.IsHTTP() || s.URL != "https://example.com/mcp" {
+		t.Fatalf("expected HTTP server, got %+v", s)
+	}
+	if s.Headers["Authorization"] != "Bearer {{env.TOKEN}}" {
+		t.Fatalf("headers not parsed: %+v", s.Headers)
+	}
+}

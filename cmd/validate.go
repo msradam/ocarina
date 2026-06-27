@@ -12,8 +12,6 @@ import (
 	"github.com/fatih/color"
 	jschema "github.com/google/jsonschema-go/jsonschema"
 	"github.com/msradam/ocarina/internal/condition"
-	"github.com/msradam/ocarina/internal/interp"
-	"github.com/msradam/ocarina/internal/mcpclient"
 	"github.com/msradam/ocarina/internal/rondo"
 	"github.com/spf13/cobra"
 )
@@ -64,13 +62,7 @@ Example:
 			if !ok {
 				continue // undefined reference; reported per-step below
 			}
-			if err := resolveServer(&srv); err != nil {
-				return err
-			}
-			if srv.Command == "" {
-				return fmt.Errorf("server %q has no command", key)
-			}
-			sess, err := mcpclient.Connect(ctx, srv.Command, interp.Strings(srv.Args, c.Keys), interp.StringMap(srv.Env, c.Keys))
+			sess, err := connectServer(ctx, srv, c.Keys)
 			if err != nil {
 				return fmt.Errorf("connect %q: %w", key, err)
 			}

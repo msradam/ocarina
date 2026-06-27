@@ -56,11 +56,21 @@ type Server struct {
 	// Name is set when the rondo uses `server: <name>` (string form).
 	// Callers must resolve Name to Command/Args/Env before connecting.
 	// Never serialized: it is an input-only convenience, not part of the schema.
-	Name    string            `yaml:"-"`
-	Command string            `yaml:"command"`
+	Name string `yaml:"-"`
+
+	// stdio transport: a local subprocess.
+	Command string            `yaml:"command,omitempty"`
 	Args    []string          `yaml:"args,omitempty"`
 	Env     map[string]string `yaml:"env,omitempty"`
+
+	// Streamable HTTP transport: a remote server. URL is mutually exclusive
+	// with Command. Headers (e.g. Authorization) are sent on every request.
+	URL     string            `yaml:"url,omitempty"`
+	Headers map[string]string `yaml:"headers,omitempty"`
 }
+
+// IsHTTP reports whether the server uses the Streamable HTTP transport.
+func (s Server) IsHTTP() bool { return s.URL != "" }
 
 // UnmarshalYAML handles both scalar (`server: github`) and map forms.
 func (s *Server) UnmarshalYAML(unmarshal func(interface{}) error) error {
@@ -152,7 +162,7 @@ func Load(path string) (*File, error) {
 	}
 
 	if len(f.Servers) == 0 {
-		if f.Server.Command != "" || f.Server.Name != "" {
+		if f.Server.Command != "" || f.Server.Name != "" || f.Server.URL != "" {
 			f.Servers = map[string]Server{"default": f.Server}
 			f.ServerOrder = []string{"default"}
 		}

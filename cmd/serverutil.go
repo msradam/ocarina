@@ -1,11 +1,32 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/msradam/ocarina/internal/interp"
+	"github.com/msradam/ocarina/internal/mcpclient"
 	"github.com/msradam/ocarina/internal/rondo"
 	"github.com/msradam/ocarina/internal/servers"
 )
+
+// connectServer resolves, interpolates, and connects to one server, picking the
+// stdio or Streamable HTTP transport. notes supplies {{key}} values for the
+// URL, headers, args, and env.
+func connectServer(ctx context.Context, srv rondo.Server, notes map[string]string) (*mcp.ClientSession, error) {
+	if srv.IsHTTP() {
+		url := interp.Apply(srv.URL, notes).(string)
+		return mcpclient.ConnectHTTP(ctx, url, interp.StringMap(srv.Headers, notes))
+	}
+	if err := resolveServer(&srv); err != nil {
+		return nil, err
+	}
+	if srv.Command == "" {
+		return nil, fmt.Errorf("server has no command or url")
+	}
+	return mcpclient.Connect(ctx, srv.Command, interp.Strings(srv.Args, notes), interp.StringMap(srv.Env, notes))
+}
 
 // resolveServer fills in Command/Args/Env on s when s.Name is set.
 // Returns an error if the name is not found in any mcp.json.

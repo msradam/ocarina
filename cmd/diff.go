@@ -7,8 +7,6 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/msradam/ocarina/internal/interp"
-	"github.com/msradam/ocarina/internal/mcpclient"
 	"github.com/msradam/ocarina/internal/rondo"
 	"github.com/spf13/cobra"
 )
@@ -48,13 +46,7 @@ Example:
 			if !ok {
 				continue // undefined reference; reported per-step below
 			}
-			if err := resolveServer(&srv); err != nil {
-				return err
-			}
-			if srv.Command == "" {
-				return fmt.Errorf("server %q has no command", key)
-			}
-			sess, err := mcpclient.Connect(ctx, srv.Command, interp.Strings(srv.Args, r.Keys), interp.StringMap(srv.Env, r.Keys))
+			sess, err := connectServer(ctx, srv, r.Keys)
 			if err != nil {
 				return fmt.Errorf("connect %q: %w", key, err)
 			}
