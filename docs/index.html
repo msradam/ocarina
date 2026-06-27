@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ocarina</title>
-  <meta name="description" content="Record an LLM's MCP tool calls to a YAML cassette. Replay them against the real server without an LLM.">
+  <meta name="description" content="Record an LLM's MCP tool calls to a YAML rondo. Replay them against the real server without an LLM.">
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/msradam/lokta-css@main/lokta.tokens.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/msradam/lokta-css@main/lokta.css">
@@ -175,7 +175,7 @@
     }
     .theme-btn:hover { background: var(--surface-inset); color: var(--text-primary); }
 
-    /* ── field annotations (for cassette format table) ───────────────────── */
+    /* ── field annotations (for rondo format table) ───────────────────── */
     .field-table { width: 100%; border-collapse: collapse; margin: var(--space-3) 0; }
     .field-table th {
       font-family: "Spline Sans Mono", ui-monospace, monospace;
@@ -278,11 +278,15 @@
       <div class="nav-section-label">Docs</div>
       <a class="lk-nav-item" href="#why">Why</a>
       <a class="lk-nav-item" href="#install">Install</a>
-      <a class="lk-nav-item" href="#cassette">Cassette format</a>
+      <a class="lk-nav-item" href="#rondo">Rondo format</a>
+      <a class="lk-nav-item nav-sub-item" href="#multi-server">Multiple servers</a>
       <a class="lk-nav-item" href="#commands">Commands</a>
+      <a class="lk-nav-item nav-sub-item" href="#docs">docs</a>
       <a class="lk-nav-item nav-sub-item" href="#record">record</a>
       <a class="lk-nav-item nav-sub-item" href="#play">play</a>
-      <a class="lk-nav-item nav-sub-item" href="#compose">compose</a>
+      <a class="lk-nav-item nav-sub-item" href="#validate">validate</a>
+      <a class="lk-nav-item nav-sub-item" href="#diff">diff</a>
+      <a class="lk-nav-item nav-sub-item" href="#hum">hum</a>
       <a class="lk-nav-item" href="#examples">Examples</a>
       <a class="lk-nav-item" href="#ci">Use in CI</a>
       <a class="lk-nav-item" href="#scope">Scope</a>
@@ -348,9 +352,9 @@
 
         <div class="code-wrap" style="max-width:480px">
           <div class="code-label">terminal</div>
-          <pre><code class="language-bash">ocarina record session.yaml uvx mcp-server-fetch
-ocarina play   session.yaml
-ocarina compose uvx mcp-server-fetch</code></pre>
+          <pre><code class="language-bash">ocarina docs   uvx mcp-server-fetch
+ocarina record session.yaml uvx mcp-server-fetch
+ocarina play   session.yaml</code></pre>
         </div>
 
         <div class="lk-measure" style="margin-top:var(--space-6)">
@@ -363,7 +367,7 @@ ocarina compose uvx mcp-server-fetch</code></pre>
 
     <!-- Demo -->
     <div class="docs-section" id="demo" style="padding-bottom:0">
-      <img src="../assets/demo.gif" alt="Ocarina demo: compose showing [readonly][idempotent] tool annotations, play running a timezone workflow, play with PASS assertions" class="demo-gif">
+      <img src="../assets/demo.gif" alt="Ocarina demo: docs listing a server's tools, play running a timezone workflow, play reporting PASS assertions" class="demo-gif">
     </div>
 
     <!-- Why -->
@@ -379,17 +383,17 @@ ocarina compose uvx mcp-server-fetch</code></pre>
         <article class="lk-feature">
           <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Record</p>
           <h3 class="lk-feature-title">Capture any session</h3>
-          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Run ocarina as a transparent stdio proxy. Every <code class="lk-code-inline">tools/call</code> request and response goes into a YAML cassette, including <code class="lk-code-inline">sampling/createMessage</code> LLM callbacks from agentic servers.</p>
+          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Run ocarina as a transparent stdio proxy. Every <code class="lk-code-inline">tools/call</code> request and response goes into a YAML rondo, including <code class="lk-code-inline">sampling/createMessage</code> LLM callbacks from agentic servers.</p>
         </article>
         <article class="lk-feature">
           <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Play</p>
           <h3 class="lk-feature-title">Replay without an LLM</h3>
-          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Execute every track in order. Chain outputs with <code class="lk-code-inline">echo:</code> and <code class="lk-code-inline">grab:</code>. Assert on results with <code class="lk-code-inline">expect:</code>. Exits non-zero if an assertion fails, so it works as a CI step.</p>
+          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Execute every step in order. Chain outputs with <code class="lk-code-inline">echo:</code> and <code class="lk-code-inline">grab:</code>. Assert on results with <code class="lk-code-inline">expect:</code>. Exits non-zero if an assertion fails, so it works as a CI step.</p>
         </article>
         <article class="lk-feature">
-          <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Compose</p>
-          <h3 class="lk-feature-title">Introspect any server</h3>
-          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">List tools with their schemas and side-effect hints (<code class="lk-code-inline">[readonly]</code>, <code class="lk-code-inline">[destructive]</code>, <code class="lk-code-inline">[idempotent]</code>). Emit a skeleton cassette with <code class="lk-code-inline">--yaml</code>.</p>
+          <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">Docs</p>
+          <h3 class="lk-feature-title">Document any server</h3>
+          <p style="color:var(--text-body);font-size:var(--type-sm);line-height:var(--lh-relaxed)">Generate markdown for every tool and resource a server exposes, with a copy-paste example step for each. The fastest way to start a new rondo.</p>
         </article>
       </div>
     </section>
@@ -413,14 +417,9 @@ ocarina compose uvx mcp-server-fetch</code></pre>
       <p style="color:var(--text-body);margin-bottom:var(--space-3)">Discover what tools a server exposes:</p>
       <div class="code-wrap">
         <div class="code-label">terminal</div>
-        <pre><code class="language-bash">ocarina compose uvx mcp-server-time
-# Server: uvx [mcp-server-time]
-# 2 tool(s) available:
-#
-#   tool: [readonly] [idempotent] get_current_time
-#     description: Get current time in a specific timezone
-#   tool: [readonly] [idempotent] convert_time
-#     description: Convert time between timezones</code></pre>
+        <pre><code class="language-bash">ocarina docs uvx mcp-server-time
+# writes markdown to stdout: one section per tool, with an
+# argument table and a copy-paste example step for each</code></pre>
       </div>
 
       <p style="color:var(--text-body);margin:var(--space-4) 0 var(--space-3)">Configure your MCP host to run Ocarina instead of the server directly, then use it normally:</p>
@@ -428,7 +427,7 @@ ocarina compose uvx mcp-server-fetch</code></pre>
         <div class="code-label">terminal</div>
         <pre><code class="language-bash">ocarina record session.yaml uvx mcp-server-fetch
 # ... use your MCP host normally ...
-# ocarina: recorded 3 track(s) to session.yaml</code></pre>
+# ocarina: recorded 3 step(s) to session.yaml</code></pre>
       </div>
 
       <p style="color:var(--text-body);margin:var(--space-4) 0 var(--space-3)">Play it back without an LLM:</p>
@@ -440,17 +439,17 @@ ocarina compose uvx mcp-server-fetch</code></pre>
       </div>
     </section>
 
-    <!-- Cassette format -->
-    <section class="docs-section" id="cassette">
-      <div class="lk-running-head"><span class="lk-eyebrow">03</span><span class="lk-eyebrow">Cassette format</span></div>
-      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Cassette format</h2>
+    <!-- Rondo format -->
+    <section class="docs-section" id="rondo">
+      <div class="lk-running-head"><span class="lk-eyebrow">03</span><span class="lk-eyebrow">Rondo format</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Rondo format</h2>
 
-      <p style="color:var(--text-body);margin-bottom:var(--space-4)">A cassette is a YAML file. Write one by hand or record it from a live session. Commit it to git.</p>
+      <p style="color:var(--text-body);margin-bottom:var(--space-4)">A rondo is a YAML file with three parts: <code class="lk-code-inline">keys</code> for variables, a <code class="lk-code-inline">server</code> (or <code class="lk-code-inline">servers</code>) to connect to, and a <code class="lk-code-inline">rondo</code> list of steps. Write one by hand or record it from a live session, then commit it to git.</p>
 
       <div class="code-wrap">
         <div class="code-label">examples/github-investigation.yaml</div>
-        <pre><code class="language-yaml"># Investigate any GitHub repo. Swap notes.owner and notes.repo to change repos.
-notes:
+        <pre><code class="language-yaml"># Investigate any GitHub repo. Change keys.owner and keys.repo to switch repos.
+keys:
   owner: modelcontextprotocol
   repo: go-sdk
 
@@ -458,22 +457,24 @@ server:
   command: npx
   args: [-y, "@modelcontextprotocol/server-github"]
 
-tracks:
+rondo:
   - name: list recent commits
     tool: list_commits
     args:
       owner: "{{owner}}"
       repo: "{{repo}}"
       per_page: 5
-    echo: commits_json      # capture output into notes
-    grab: ".0.sha"          # extract first SHA from JSON array
+    grab: ".0.sha"          # extract the first SHA from the JSON array
+    echo: latest_sha        # capture it into keys for later steps
 
   - name: show latest commit
     tool: get_commit
     args:
       owner: "{{owner}}"
       repo: "{{repo}}"
-      sha: "{{commits_json}}"  # value from previous track
+      sha: "{{latest_sha}}"   # value from the previous step
+    expect:
+      contains: "author"
 
   - name: list open issues
     tool: list_issues
@@ -483,32 +484,64 @@ tracks:
       state: open</code></pre>
       </div>
 
-      <h3 class="lk-h3" style="margin:var(--space-6) 0 var(--space-3)">Track fields</h3>
+      <h3 class="lk-h3" style="margin:var(--space-6) 0 var(--space-3)">Step fields</h3>
       <table class="field-table">
         <thead>
           <tr><th>Field</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td><code class="lk-code-inline">tool</code></td><td>Tool name to call.</td></tr>
-          <tr><td><code class="lk-code-inline">args</code></td><td>Arguments. <code class="lk-code-inline">{{key}}</code> interpolates from <code class="lk-code-inline">notes</code>.</td></tr>
-          <tr><td><code class="lk-code-inline">echo</code></td><td>Capture text output into <code class="lk-code-inline">notes</code> under this key for use in later tracks.</td></tr>
-          <tr><td><code class="lk-code-inline">grab</code></td><td>Dot-path into JSON output (<code class="lk-code-inline">.0.sha</code>, <code class="lk-code-inline">.name</code>), applied before <code class="lk-code-inline">echo</code> captures.</td></tr>
-          <tr><td><code class="lk-code-inline">expect.contains</code></td><td>Assert output contains this string. <code class="lk-code-inline">play</code> exits non-zero if not. Interpolates <code class="lk-code-inline">{{notes}}</code>.</td></tr>
-          <tr><td><code class="lk-code-inline">result</code></td><td>Recorded output, kept for reference. Not used during replay.</td></tr>
+          <tr><td><code class="lk-code-inline">tool</code></td><td>Tool to call (<code class="lk-code-inline">tools/call</code>).</td></tr>
+          <tr><td><code class="lk-code-inline">resource</code></td><td>Resource URI to read (<code class="lk-code-inline">resources/read</code>).</td></tr>
+          <tr><td><code class="lk-code-inline">list_resources</code></td><td>List a server's resources. Output is a JSON array of URIs.</td></tr>
+          <tr><td><code class="lk-code-inline">sleep</code></td><td>Pause for a duration (<code class="lk-code-inline">500ms</code>, <code class="lk-code-inline">2s</code>) to pace a run.</td></tr>
+          <tr><td><code class="lk-code-inline">server</code></td><td>Which entry in <code class="lk-code-inline">servers</code> to run this step against. Defaults to the first.</td></tr>
+          <tr><td><code class="lk-code-inline">args</code></td><td>Tool arguments. <code class="lk-code-inline">{{key}}</code> interpolates from <code class="lk-code-inline">keys</code>, a prior <code class="lk-code-inline">echo:</code>, or <code class="lk-code-inline">{{env.NAME}}</code>.</td></tr>
+          <tr><td><code class="lk-code-inline">when</code></td><td>CEL condition; the step runs only if it is true. Bare variable names, not <code class="lk-code-inline">{{...}}</code>.</td></tr>
+          <tr><td><code class="lk-code-inline">loop</code></td><td>Iterate over a JSON array, setting <code class="lk-code-inline">{{item}}</code> each pass.</td></tr>
+          <tr><td><code class="lk-code-inline">grab</code></td><td>gjson path into the JSON result (<code class="lk-code-inline">.0.sha</code>, <code class="lk-code-inline">.name</code>), applied before <code class="lk-code-inline">echo</code>.</td></tr>
+          <tr><td><code class="lk-code-inline">echo</code></td><td>Capture the (grabbed) value into a key for later steps. <code class="lk-code-inline">register:</code> is an alias.</td></tr>
+          <tr><td><code class="lk-code-inline">expect</code></td><td>Assertions: <code class="lk-code-inline">contains</code>, <code class="lk-code-inline">matches</code> (regex), <code class="lk-code-inline">equals</code>, <code class="lk-code-inline">is_error</code>, <code class="lk-code-inline">rule</code> (CEL), <code class="lk-code-inline">message</code>. <code class="lk-code-inline">play</code> exits non-zero on failure.</td></tr>
+          <tr><td><code class="lk-code-inline">timeout</code></td><td>Per-step deadline (<code class="lk-code-inline">10s</code>). The step fails if it is exceeded.</td></tr>
+          <tr><td><code class="lk-code-inline">retry</code></td><td><code class="lk-code-inline">retries</code>, <code class="lk-code-inline">delay</code>, and <code class="lk-code-inline">until:</code> (CEL). Re-run until the condition holds.</td></tr>
+          <tr><td><code class="lk-code-inline">tags</code></td><td>Label the step for <code class="lk-code-inline">--tags</code> / <code class="lk-code-inline">--skip-tags</code> filtering.</td></tr>
+          <tr><td><code class="lk-code-inline">ignore_errors</code></td><td>Continue past a failing step instead of failing the run.</td></tr>
         </tbody>
       </table>
 
-      <h3 class="lk-h3" style="margin:var(--space-6) 0 var(--space-3)">Cassette-level fields</h3>
+      <h3 class="lk-h3" style="margin:var(--space-6) 0 var(--space-3)">Rondo-level fields</h3>
       <table class="field-table">
         <thead>
           <tr><th>Field</th><th>Description</th></tr>
         </thead>
         <tbody>
-          <tr><td><code class="lk-code-inline">notes</code></td><td>Static variables, interpolated as <code class="lk-code-inline">{{key}}</code> throughout all tracks.</td></tr>
-          <tr><td><code class="lk-code-inline">server</code></td><td>Command and args to launch the MCP server.</td></tr>
-          <tr><td><code class="lk-code-inline">llm</code></td><td>Captured <code class="lk-code-inline">sampling/createMessage</code> exchanges. Populated by <code class="lk-code-inline">record</code> when an agentic server calls back to the LLM.</td></tr>
+          <tr><td><code class="lk-code-inline">keys</code></td><td>Static variables, interpolated as <code class="lk-code-inline">{{key}}</code> everywhere. Override at run time with <code class="lk-code-inline">-e key=value</code>.</td></tr>
+          <tr><td><code class="lk-code-inline">servers</code></td><td>A map of named servers (<code class="lk-code-inline">command</code>, <code class="lk-code-inline">args</code>, <code class="lk-code-inline">env</code>). Steps pick one with <code class="lk-code-inline">server:</code>.</td></tr>
+          <tr><td><code class="lk-code-inline">server</code></td><td>A single server block, the shorthand when a rondo talks to one server.</td></tr>
+          <tr><td><code class="lk-code-inline">llm</code></td><td>Captured <code class="lk-code-inline">sampling/createMessage</code> exchanges. Written by <code class="lk-code-inline">record</code> when an agentic server calls back to the LLM.</td></tr>
         </tbody>
       </table>
+
+      <p style="color:var(--text-muted);font-size:var(--type-sm);margin-top:var(--space-4)">Coming from Ansible? <code class="lk-code-inline">tasks:</code> is accepted in place of <code class="lk-code-inline">rondo:</code>, and <code class="lk-code-inline">register:</code> in place of <code class="lk-code-inline">echo:</code>.</p>
+
+      <h3 class="lk-h3" id="multi-server" style="margin:var(--space-6) 0 var(--space-3)">Multiple servers</h3>
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">One rondo can talk to several servers. Declare them under <code class="lk-code-inline">servers</code> and set <code class="lk-code-inline">server:</code> on each step. A step that omits <code class="lk-code-inline">server:</code> uses the first entry. When more than one server is in play, output and <code class="lk-code-inline">diff</code> namespace tool names by server, like <code class="lk-code-inline">time.get_current_time</code>.</p>
+      <div class="code-wrap" style="margin-top:var(--space-3)">
+        <div class="code-label">multi-server.yaml</div>
+        <pre><code class="language-yaml">servers:
+  time:  {command: uvx, args: [mcp-server-time]}
+  fetch: {command: uvx, args: [mcp-server-fetch]}
+
+rondo:
+  - name: get the time
+    server: time
+    tool: get_current_time
+    args: {timezone: UTC}
+
+  - name: fetch a page
+    server: fetch
+    tool: fetch
+    args: {url: "https://example.com"}</code></pre>
+      </div>
     </section>
 
     <!-- Commands -->
@@ -516,11 +549,29 @@ tracks:
       <div class="lk-running-head"><span class="lk-eyebrow">04</span><span class="lk-eyebrow">Commands</span></div>
       <h2 class="lk-h2" style="margin:var(--space-4) 0">Commands</h2>
 
+      <!-- docs -->
+      <div class="cmd-block" id="docs">
+        <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">docs</p>
+        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina docs &lt;command&gt; [args...]</h3>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Connects to a server and writes markdown for every tool and resource it exposes: a synopsis, an argument table, and a copy-paste example step. The fastest way to learn a server and start a rondo.</p>
+        <div class="code-wrap">
+          <div class="code-label">terminal</div>
+          <pre><code class="language-bash">ocarina docs uvx mcp-server-time
+ocarina docs --out docs/github.md npx -y @modelcontextprotocol/server-github</code></pre>
+        </div>
+        <p style="color:var(--text-body);margin:var(--space-3) 0 var(--space-2);font-size:var(--type-sm)"><strong>Flags</strong></p>
+        <table class="field-table" style="max-width:480px">
+          <tbody>
+            <tr><td><code class="lk-code-inline">--out FILE</code></td><td>Write to a file instead of stdout. Place it before the server command.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
       <!-- record -->
-      <div class="cmd-block" id="record">
+      <div class="cmd-block" id="record" style="margin-top:var(--space-6)">
         <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">record</p>
         <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina record &lt;output.yaml&gt; &lt;command&gt; [args...]</h3>
-        <p style="color:var(--text-body);margin-bottom:var(--space-4)">A stdio proxy between your MCP host and server. Records every <code class="lk-code-inline">tools/call</code> request and response. Also captures <code class="lk-code-inline">sampling/createMessage</code> exchanges when an agentic server calls back to the LLM, stored in the cassette's <code class="lk-code-inline">llm:</code> block.</p>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">A stdio proxy between your MCP host and server. Records every <code class="lk-code-inline">tools/call</code> request and response into a rondo. Also captures <code class="lk-code-inline">sampling/createMessage</code> exchanges when an agentic server calls back to the LLM, stored in the rondo's <code class="lk-code-inline">llm:</code> block.</p>
         <div class="code-wrap">
           <div class="code-label">terminal</div>
           <pre><code class="language-bash">ocarina record out.yaml uvx mcp-server-sqlite --db-path /tmp/db.sqlite
@@ -529,7 +580,7 @@ ocarina record out.yaml npx -y @modelcontextprotocol/server-github</code></pre>
         <p style="color:var(--text-body);margin:var(--space-3) 0 var(--space-2);font-size:var(--type-sm)"><strong>Flags</strong></p>
         <table class="field-table" style="max-width:480px">
           <tbody>
-            <tr><td><code class="lk-code-inline">--no-result</code></td><td>Omit result blocks from the cassette (smaller files, cleaner diffs).</td></tr>
+            <tr><td><code class="lk-code-inline">--no-result</code></td><td>Omit result blocks from the rondo (smaller files, cleaner diffs).</td></tr>
           </tbody>
         </table>
       </div>
@@ -537,33 +588,55 @@ ocarina record out.yaml npx -y @modelcontextprotocol/server-github</code></pre>
       <!-- play -->
       <div class="cmd-block" id="play" style="margin-top:var(--space-6)">
         <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">play</p>
-        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina play &lt;cassette.yaml&gt;</h3>
-        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Executes each track in order against the live server. No LLM needed. Notes from <code class="lk-code-inline">echo:</code> feed into subsequent tracks via <code class="lk-code-inline">{{key}}</code> interpolation. Exits non-zero if any <code class="lk-code-inline">expect:</code> assertion fails.</p>
+        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina play &lt;rondo.yaml&gt;</h3>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Executes each step in order against the live server. No LLM needed. Values captured with <code class="lk-code-inline">echo:</code> feed into later steps through <code class="lk-code-inline">{{key}}</code> interpolation. Exits non-zero if any step fails or any <code class="lk-code-inline">expect:</code> assertion fails, so it works as a CI step.</p>
         <div class="code-wrap">
           <div class="code-label">terminal</div>
           <pre><code class="language-bash">ocarina play examples/github-investigation.yaml
 ocarina play examples/mcp-smoke-test.yaml   # has assertions
-ocarina play examples/github-investigation.yaml --dry-run</code></pre>
+ocarina play examples/time-zones.yaml -e owner=acme --tags smoke</code></pre>
         </div>
         <p style="color:var(--text-body);margin:var(--space-3) 0 var(--space-2);font-size:var(--type-sm)"><strong>Flags</strong></p>
-        <table class="field-table" style="max-width:480px">
+        <table class="field-table" style="max-width:560px">
           <tbody>
-            <tr><td><code class="lk-code-inline">--dry-run</code></td><td>Print tracks without executing them.</td></tr>
+            <tr><td><code class="lk-code-inline">--dry-run</code></td><td>Print steps without executing them.</td></tr>
+            <tr><td><code class="lk-code-inline">-e key=value</code></td><td>Override a <code class="lk-code-inline">keys</code> variable at run time. Repeatable.</td></tr>
+            <tr><td><code class="lk-code-inline">--tags</code> / <code class="lk-code-inline">--skip-tags</code></td><td>Run only, or skip, steps with the given tags.</td></tr>
           </tbody>
         </table>
       </div>
 
-      <!-- compose -->
-      <div class="cmd-block" id="compose" style="margin-top:var(--space-6)">
-        <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">compose</p>
-        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina compose &lt;command&gt; [args...]</h3>
-        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Connects to a server and lists tools with their schemas. Servers that declare side-effect hints show badges: <code class="lk-code-inline">[readonly]</code>, <code class="lk-code-inline">[destructive]</code>, <code class="lk-code-inline">[idempotent]</code>. Use <code class="lk-code-inline">--yaml</code> to emit a skeleton cassette instead.</p>
+      <!-- validate -->
+      <div class="cmd-block" id="validate" style="margin-top:var(--space-6)">
+        <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">validate</p>
+        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina validate &lt;rondo.yaml&gt;</h3>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Checks a rondo against the server's schemas without calling any tools: the tool exists, required args are present, types match, every <code class="lk-code-inline">{{key}}</code> resolves, and the CEL, <code class="lk-code-inline">timeout:</code>, and <code class="lk-code-inline">server:</code> references are valid. Exits non-zero on errors. The pre-flight.</p>
         <div class="code-wrap">
           <div class="code-label">terminal</div>
-          <pre><code class="language-bash">ocarina compose uvx mcp-server-fetch
-ocarina compose uvx mcp-server-sqlite --db-path /tmp/db.sqlite
-ocarina compose npx -y @modelcontextprotocol/server-filesystem /tmp
-ocarina compose --yaml uvx mcp-server-fetch   # emit skeleton cassette</code></pre>
+          <pre><code class="language-bash">ocarina validate examples/github-investigation.yaml</code></pre>
+        </div>
+      </div>
+
+      <!-- diff -->
+      <div class="cmd-block" id="diff" style="margin-top:var(--space-6)">
+        <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">diff</p>
+        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina diff &lt;rondo.yaml&gt;</h3>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Connects to the live server and compares the rondo's tools against the current schemas. Flags tools that were removed, args that became required, server references that are undefined, and new tools the server now offers. Exits non-zero if a tool the rondo uses is gone. Schema-drift detection for CI.</p>
+        <div class="code-wrap">
+          <div class="code-label">terminal</div>
+          <pre><code class="language-bash">ocarina diff examples/github-investigation.yaml</code></pre>
+        </div>
+      </div>
+
+      <!-- hum -->
+      <div class="cmd-block" id="hum" style="margin-top:var(--space-6)">
+        <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">hum</p>
+        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina hum &lt;command&gt; [args...] -- &lt;tool&gt; [key=value ...]</h3>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Calls a single tool ad hoc and prints the result. Use it to see a tool's real output shape before you write a step around it. Values are coerced to their natural type, so <code class="lk-code-inline">per_page=1</code> is sent as a number.</p>
+        <div class="code-wrap">
+          <div class="code-label">terminal</div>
+          <pre><code class="language-bash">ocarina hum uvx mcp-server-time -- get_current_time timezone=UTC
+ocarina hum npx -y @modelcontextprotocol/server-github -- list_commits owner=pytorch repo=pytorch per_page=1</code></pre>
         </div>
       </div>
     </section>
@@ -572,7 +645,7 @@ ocarina compose --yaml uvx mcp-server-fetch   # emit skeleton cassette</code></p
     <section class="docs-section" id="examples">
       <div class="lk-running-head"><span class="lk-eyebrow">05</span><span class="lk-eyebrow">Examples</span></div>
       <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Examples</h2>
-      <p style="color:var(--text-body);margin-bottom:var(--space-4)">Working cassettes in <code class="lk-code-inline">examples/</code>, each verified against a live server.</p>
+      <p style="color:var(--text-body);margin-bottom:var(--space-4)">Working rondos in <code class="lk-code-inline">examples/</code>, each verified against a live server.</p>
 
       <table class="ex-table">
         <thead>
@@ -607,7 +680,7 @@ ocarina compose --yaml uvx mcp-server-fetch   # emit skeleton cassette</code></p
           <tr>
             <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/sequential-thinking-demo.yaml" target="_blank">sequential-thinking-demo.yaml</a></td>
             <td><code class="lk-code-inline">server-sequential-thinking</code></td>
-            <td>Multi-step reasoning chain captured as a cassette</td>
+            <td>Multi-step reasoning chain captured as a rondo</td>
           </tr>
           <tr>
             <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/knowledge-graph-demo.yaml" target="_blank">knowledge-graph-demo.yaml</a></td>
@@ -656,9 +729,18 @@ jobs:
     <!-- Scope -->
     <section class="docs-section" id="scope">
       <div class="lk-running-head"><span class="lk-eyebrow">07</span><span class="lk-eyebrow">Scope</span></div>
-      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">What Ocarina is not</h2>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">What MCP makes easy, and what it does not yet</h2>
 
-      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">Ocarina does not score LLM outputs, compare models, or track token costs. It connects to the real MCP server on every <code class="lk-code-inline">play</code> run, so a broken server breaks the replay. It has no test runner, no discovery, and no report format beyond stdout and exit codes.</p>
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">Ocarina works because MCP gives every server the same shape: named tools with typed arguments, reachable over one protocol. Learn the grammar once and you can drive a time server, a GitHub server, a Postgres database, and a 3D modeling app with the same YAML. You point Ocarina at a server, fill in the calls, and it runs them the same way on every execution. That part is solid today.</p>
+
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed);margin-top:var(--space-4)">The friction is in what comes back. These servers were built so a model could read the output and decide what to do next, so many of them answer in prose rather than data. <code class="lk-code-inline">mcp-server-fetch</code> returns markdown. <code class="lk-code-inline">mcp-server-sqlite</code> returns the Python repr of a row, single quotes and all. The arguments are typed; the results often are not. Ocarina smooths over the common cases, and will parse that Python repr before a <code class="lk-code-inline">grab:</code> runs, but when a server replies in free text, pulling a clean value out of it stays awkward. That ceiling belongs to the server, not to Ocarina.</p>
+
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed);margin-top:var(--space-4)">Errors are uneven for the same reason. The spec lets a tool flag a failure with <code class="lk-code-inline">isError</code>, but plenty of servers report trouble as ordinary text and never set it. Ocarina catches a misspelled tool name or a missing required argument by checking the live schema before it calls, so those fail loudly. A server that returns <span style="font-style:italic">table not found</span> as a cheerful string is harder to catch on its own, and that is what an <code class="lk-code-inline">expect:</code> assertion is for.</p>
+
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed);margin-top:var(--space-4)">So the honest scope. Ocarina is an automation framework for the MCP servers that behave like clean RPC, and a deterministic test harness for the ones that do not. Today that means smoke tests in CI and scripts that chain a few well-behaved servers together. Recording a session and replaying it without a model works now too. The reach grows as the ecosystem matures and servers return more structure. The Blender demo on the home page is the far end of what is already possible. The rough edges above are the near end you will actually hit.</p>
+
+      <h3 class="lk-h3" style="margin:var(--space-6) 0 var(--space-3)">What Ocarina is not</h3>
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">It does not score LLM outputs, compare models, or track token costs. It connects to the real server on every <code class="lk-code-inline">play</code> run, so a broken server breaks the replay. It runs one linear pass with no scheduler and no state carried between runs. The output is stdout and an exit code.</p>
 
       <div class="lk-measure" style="margin:var(--space-6) 0"><span class="lk-measure-line" style="width:60px"></span><span class="lk-measure-gap"></span><span class="lk-measure-hatch"></span></div>
 
