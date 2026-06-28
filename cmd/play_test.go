@@ -220,4 +220,83 @@ func TestMotifNotes(t *testing.T) {
 	}
 }
 
+func TestRunBlock(t *testing.T) {
+	// fakeRun fails any step whose Name is in the failSet, and records the
+	// order steps ran so we can assert short-circuit and always: behavior.
+	newRun := func(failSet map[string]bool, ran *[]string) func([]rondo.Step) []string {
+		return func(sub []rondo.Step) []string {
+			var f []string
+			for _, s := range sub {
+				*ran = append(*ran, s.Name)
+				if failSet[s.Name] {
+					f = append(f, s.Name+" failed")
+				}
+			}
+			return f
+		}
+	}
+	blk := func() rondo.Step {
+		return rondo.Step{
+			Block:  []rondo.Step{{Name: "b1"}, {Name: "b2"}},
+			Rescue: []rondo.Step{{Name: "r1"}},
+			Always: []rondo.Step{{Name: "a1"}},
+		}
+	}
+
+	t.Run("block succeeds: rescue skipped, always runs", func(t *testing.T) {
+		var ran []string
+		out := runBlock(blk(), newRun(map[string]bool{}, &ran))
+		if len(out) != 0 {
+			t.Fatalf("clean block should report no failures, got %v", out)
+		}
+		want := []string{"b1", "b2", "a1"} // no r1
+		if got := join(ran); got != join(want) {
+			t.Fatalf("ran %v, want %v (rescue must be skipped)", ran, want)
+		}
+	})
+
+	t.Run("block fails, rescue recovers: no failures, block short-circuits", func(t *testing.T) {
+		var ran []string
+		out := runBlock(blk(), newRun(map[string]bool{"b1": true}, &ran))
+		if len(out) != 0 {
+			t.Fatalf("a clean rescue must recover, got failures %v", out)
+		}
+		want := []string{"b1", "r1", "a1"} // b2 skipped (block stops at first failure)
+		if got := join(ran); got != join(want) {
+			t.Fatalf("ran %v, want %v", ran, want)
+		}
+	})
+
+	t.Run("block fails, rescue also fails: failures propagate", func(t *testing.T) {
+		var ran []string
+		out := runBlock(blk(), newRun(map[string]bool{"b1": true, "r1": true}, &ran))
+		if len(out) != 2 {
+			t.Fatalf("block+rescue failures should propagate, got %v", out)
+		}
+	})
+
+	t.Run("always runs even when block fails with no rescue", func(t *testing.T) {
+		var ran []string
+		step := rondo.Step{Block: []rondo.Step{{Name: "b1"}}, Always: []rondo.Step{{Name: "a1"}}}
+		out := runBlock(step, newRun(map[string]bool{"b1": true}, &ran))
+		if len(out) != 1 {
+			t.Fatalf("unrescued block failure should propagate, got %v", out)
+		}
+		if join(ran) != join([]string{"b1", "a1"}) {
+			t.Fatalf("always must run regardless, ran %v", ran)
+		}
+	})
+
+	t.Run("a failing always step propagates even on a clean block", func(t *testing.T) {
+		var ran []string
+		step := rondo.Step{Block: []rondo.Step{{Name: "b1"}}, Always: []rondo.Step{{Name: "a1"}}}
+		out := runBlock(step, newRun(map[string]bool{"a1": true}, &ran))
+		if len(out) != 1 {
+			t.Fatalf("a failing always: must surface, got %v", out)
+		}
+	})
+}
+
+func join(ss []string) string { return strings.Join(ss, ",") }
+
 func boolPtr(b bool) *bool { return &b }

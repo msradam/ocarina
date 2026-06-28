@@ -126,8 +126,9 @@ Example:
 		var failures []string
 		baseDir := filepath.Dir(args[0])
 
-		var runSteps func(steps []rondo.Step, notes map[string]string, dir string, depth int)
-		runSteps = func(steps []rondo.Step, notes map[string]string, dir string, depth int) {
+		var runSteps func(steps []rondo.Step, notes map[string]string, dir string, depth int) []string
+		runSteps = func(steps []rondo.Step, notes map[string]string, dir string, depth int) []string {
+			var fails []string
 			for i, step := range steps {
 				name := step.Name
 				if name == "" {
@@ -143,7 +144,7 @@ Example:
 						ok, evalErr := condition.EvalBool(step.When, notes, "")
 						if evalErr != nil {
 							fmt.Fprintf(os.Stderr, "    %s when: %v\n\n", red("error:"), evalErr)
-							failures = append(failures, fmt.Sprintf("step %q when: %v", name, evalErr))
+							fails = append(fails, fmt.Sprintf("step %q when: %v", name, evalErr))
 							continue
 						}
 						if !ok {
@@ -153,7 +154,7 @@ Example:
 					}
 					if depth >= maxMotifDepth {
 						fmt.Fprintf(os.Stderr, "    %s motif nesting exceeds %d levels (cycle?)\n\n", red("error:"), maxMotifDepth)
-						failures = append(failures, fmt.Sprintf("step %q: motif nesting too deep", name))
+						fails = append(fails, fmt.Sprintf("step %q: motif nesting too deep", name))
 						continue
 					}
 					path := step.Motif
@@ -163,11 +164,34 @@ Example:
 					mf, mErr := rondo.Load(path)
 					if mErr != nil {
 						fmt.Fprintf(os.Stderr, "    %s motif %s: %v\n\n", red("error:"), step.Motif, mErr)
-						failures = append(failures, fmt.Sprintf("step %q: motif %s: %v", name, step.Motif, mErr))
+						fails = append(fails, fmt.Sprintf("step %q: motif %s: %v", name, step.Motif, mErr))
 						continue
 					}
 					fmt.Fprintf(stdout, "%s %s (motif %s)\n\n", boldCyan("==>"), name, step.Motif)
-					runSteps(mf.Steps, motifNotes(mf.Keys, interp.StringMap(step.With, notes)), filepath.Dir(path), depth+1)
+					fails = append(fails, runSteps(mf.Steps, motifNotes(mf.Keys, interp.StringMap(step.With, notes)), filepath.Dir(path), depth+1)...)
+					continue
+				}
+
+				if len(step.Block) > 0 || len(step.Rescue) > 0 || len(step.Always) > 0 {
+					if step.When != "" {
+						ok, evalErr := condition.EvalBool(step.When, notes, "")
+						if evalErr != nil {
+							fmt.Fprintf(os.Stderr, "    %s when: %v\n\n", red("error:"), evalErr)
+							fails = append(fails, fmt.Sprintf("step %q when: %v", name, evalErr))
+							continue
+						}
+						if !ok {
+							fmt.Fprintf(stdout, "%s %s\n    %s\n\n", boldCyan("==>"), name, yellowPlay("skipped"))
+							continue
+						}
+					}
+					if step.Name != "" {
+						fmt.Fprintf(stdout, "%s %s (block)\n\n", boldCyan("==>"), name)
+					}
+					run := func(sub []rondo.Step) []string {
+						return runSteps(sub, notes, dir, depth)
+					}
+					fails = append(fails, runBlock(step, run)...)
 					continue
 				}
 
@@ -178,7 +202,7 @@ Example:
 						continue
 					}
 					fmt.Fprintf(os.Stderr, "%s %s\n    %s %v\n\n", boldCyan("==>"), name, red("error:"), err)
-					failures = append(failures, fmt.Sprintf("step %q loop: %v", name, err))
+					fails = append(fails, fmt.Sprintf("step %q loop: %v", name, err))
 					continue
 				}
 
@@ -214,7 +238,7 @@ Example:
 						ok, evalErr := condition.EvalBool(step.When, iterNotes, "")
 						if evalErr != nil {
 							fmt.Fprintf(os.Stderr, "    %s when: %v\n\n", red("error:"), evalErr)
-							failures = append(failures, fmt.Sprintf("step %q when: %v", name, evalErr))
+							fails = append(fails, fmt.Sprintf("step %q when: %v", name, evalErr))
 							continue
 						}
 						if !ok {
@@ -234,7 +258,7 @@ Example:
 						d, parseErr := time.ParseDuration(step.Timeout)
 						if parseErr != nil {
 							fmt.Fprintf(os.Stderr, "    %s invalid timeout %q: %v\n\n", red("error:"), step.Timeout, parseErr)
-							failures = append(failures, fmt.Sprintf("step %q: invalid timeout %q", name, step.Timeout))
+							fails = append(fails, fmt.Sprintf("step %q: invalid timeout %q", name, step.Timeout))
 							continue
 						}
 						stepCtx, cancelFn = context.WithTimeout(ctx, d)
@@ -246,7 +270,7 @@ Example:
 							cancelFn()
 						}
 						fmt.Fprintf(os.Stderr, "    %s %v\n\n", red("error:"), sessErr)
-						failures = append(failures, fmt.Sprintf("step %q: %v", name, sessErr))
+						fails = append(fails, fmt.Sprintf("step %q: %v", name, sessErr))
 						continue
 					}
 
@@ -274,7 +298,7 @@ Example:
 								continue
 							}
 							fmt.Fprintf(os.Stderr, "    %s %s\n\n", red("error:"), schemaErr)
-							failures = append(failures, fmt.Sprintf("step %q: %s", name, schemaErr))
+							fails = append(fails, fmt.Sprintf("step %q: %s", name, schemaErr))
 							continue
 						}
 					}
@@ -290,7 +314,7 @@ Example:
 							continue
 						}
 						fmt.Fprint(os.Stderr, msg)
-						failures = append(failures, fmt.Sprintf("step %q: %v", name, dispatchErr))
+						fails = append(fails, fmt.Sprintf("step %q: %v", name, dispatchErr))
 						continue
 					}
 
@@ -300,7 +324,7 @@ Example:
 						expectsError := step.Expect != nil && step.Expect.IsError != nil && *step.Expect.IsError
 						if !expectsError {
 							fmt.Fprintf(os.Stderr, "    %s %s\n\n", red("error:"), truncate(output, 200))
-							failures = append(failures, fmt.Sprintf("step %q: tool returned an error", name))
+							fails = append(fails, fmt.Sprintf("step %q: tool returned an error", name))
 							continue
 						}
 					}
@@ -311,7 +335,7 @@ Example:
 						if grabErr != nil {
 							if !step.IgnoreErrors {
 								fmt.Fprintf(os.Stderr, "    %s %v\n\n", red("error:"), grabErr)
-								failures = append(failures, fmt.Sprintf("step %q: %v", name, grabErr))
+								fails = append(fails, fmt.Sprintf("step %q: %v", name, grabErr))
 								continue
 							}
 							fmt.Fprintf(os.Stderr, "    %s %v\n", yellowPlay("grab:"), grabErr)
@@ -335,7 +359,7 @@ Example:
 						if fail != "" {
 							fmt.Fprintf(os.Stderr, "    %s %s\n", red("FAIL:"), fail)
 							if !step.IgnoreErrors {
-								failures = append(failures, fmt.Sprintf("step %q: %s", name, fail))
+								fails = append(fails, fmt.Sprintf("step %q: %s", name, fail))
 							}
 						}
 					}
@@ -343,8 +367,9 @@ Example:
 					fmt.Fprintln(stdout)
 				}
 			}
+			return fails
 		}
-		runSteps(c.Steps, notes, baseDir, 0)
+		failures = runSteps(c.Steps, notes, baseDir, 0)
 
 		if outputJSON {
 			_ = json.NewEncoder(os.Stdout).Encode(map[string]any{
@@ -619,10 +644,43 @@ func motifNotes(defaults, with map[string]string) map[string]string {
 	return n
 }
 
+// runBlock executes a block/rescue/always step with try-catch semantics: run
+// the block steps until one fails; on failure run rescue (a clean rescue
+// recovers, dropping the block's failures); always run the always steps
+// regardless. run executes a sub-list and returns its failures.
+func runBlock(step rondo.Step, run func([]rondo.Step) []string) []string {
+	var blockFails []string
+	for _, bs := range step.Block {
+		if f := run([]rondo.Step{bs}); len(f) > 0 {
+			blockFails = f
+			break // stop the block at the first failure, like Ansible
+		}
+	}
+
+	var out []string
+	if len(blockFails) > 0 {
+		if len(step.Rescue) > 0 {
+			if rf := run(step.Rescue); len(rf) > 0 {
+				out = append(out, blockFails...)
+				out = append(out, rf...)
+			}
+			// a clean rescue recovers: the block's failures are dropped
+		} else {
+			out = append(out, blockFails...)
+		}
+	}
+	if len(step.Always) > 0 {
+		out = append(out, run(step.Always)...)
+	}
+	return out
+}
+
 func stepLabel(t rondo.Step) string {
 	switch {
 	case t.Motif != "":
 		return "motif:" + t.Motif
+	case len(t.Block) > 0 || len(t.Rescue) > 0 || len(t.Always) > 0:
+		return "block"
 	case t.Tool != "":
 		return t.Tool
 	case t.Resource != "":

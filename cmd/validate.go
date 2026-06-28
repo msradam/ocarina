@@ -105,7 +105,8 @@ Example:
 
 		var totalErrs, totalWarns int
 
-		for i, step := range c.Steps {
+		steps := flattenForValidation(c.Steps)
+		for i, step := range steps {
 			name := step.Name
 			if name == "" {
 				name = fmt.Sprintf("step %d", i+1)
@@ -276,7 +277,7 @@ Example:
 
 		fmt.Fprintln(os.Stdout)
 		if totalErrs == 0 && totalWarns == 0 {
-			fmt.Fprintf(os.Stdout, "%s\n", color.GreenString("all %d step(s) valid", len(c.Steps)))
+			fmt.Fprintf(os.Stdout, "%s\n", color.GreenString("all %d step(s) valid", len(steps)))
 			return nil
 		}
 		fmt.Fprintf(os.Stdout, "%s\n", color.RedString("%d error(s)", totalErrs)+color.YellowString(", %d warning(s)", totalWarns))
@@ -285,6 +286,23 @@ Example:
 		}
 		return nil
 	},
+}
+
+// flattenForValidation expands block/rescue/always groups inline so their
+// sub-steps get the same static checks as top-level steps. Motif and normal
+// steps pass through unchanged.
+func flattenForValidation(steps []rondo.Step) []rondo.Step {
+	var out []rondo.Step
+	for _, s := range steps {
+		if len(s.Block) > 0 || len(s.Rescue) > 0 || len(s.Always) > 0 {
+			out = append(out, flattenForValidation(s.Block)...)
+			out = append(out, flattenForValidation(s.Rescue)...)
+			out = append(out, flattenForValidation(s.Always)...)
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
 func init() {

@@ -1,0 +1,71 @@
+# Mirrors the canonical Ansible block/rescue/always playbook, driven against a
+# real MCP server instead of SSH. Run it:
+#
+#   ocarina validate examples/block-rescue/provision.yaml
+#   ocarina play     examples/block-rescue/provision.yaml
+#
+# Ansible source (1:1 structure):
+# https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_blocks.html
+
+keys:
+  dir: /private/tmp/ocarina-block-demo
+
+server:
+  command: npx
+  args: [-y, "@modelcontextprotocol/server-filesystem", /private/tmp]
+
+rondo:
+  # setup fixture, like `roles:` / include_role
+  - name: provision the workspace
+    motif: motifs/workspace.yaml
+    with:
+      dir: "{{dir}}"
+
+  # seed a few files, like an Ansible loop
+  - name: seed config files
+    tool: write_file
+    loop: '["alpha.conf", "beta.conf", "gamma.conf"]'
+    args:
+      path: "{{dir}}/{{item}}"
+      content: "managed by ocarina"
+
+  - name: Attempt and graceful roll back demo
+    block:
+      - name: Read a config that exists (executes normally)
+        tool: read_text_file
+        args:
+          path: "{{dir}}/alpha.conf"
+        expect:
+          contains: managed by ocarina
+
+      - name: Force a failure (read a file that is not there)
+        tool: read_text_file
+        args:
+          path: "{{dir}}/does-not-exist.conf"
+
+      - name: Never run this
+        tool: write_file
+        args:
+          path: "{{dir}}/should-not-exist.conf"
+          content: unreachable
+    rescue:
+      - name: Caught the error, roll back
+        tool: write_file
+        args:
+          path: "{{dir}}/ROLLBACK"
+          content: "block failed; recovered cleanly"
+    always:
+      - name: Always report the workspace state
+        tool: list_directory
+        args:
+          path: "{{dir}}"
+        expect:
+          contains: ROLLBACK
+
+  # runs only because the block above was rescued (recovered)
+  - name: confirm recovery, the play continued
+    tool: read_text_file
+    args:
+      path: "{{dir}}/ROLLBACK"
+    expect:
+      contains: recovered cleanly

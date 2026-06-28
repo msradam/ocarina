@@ -94,6 +94,13 @@ type Step struct {
 	IgnoreErrors  bool              `yaml:"ignore_errors,omitempty"`
 	Expect        *Expect           `yaml:"expect,omitempty"`
 	Result        []ResultItem      `yaml:"result,omitempty"`
+
+	// block/rescue/always mirror Ansible's error handling. block runs until a
+	// step fails; rescue runs on failure (a clean rescue recovers); always runs
+	// regardless. Each is a nested step list.
+	Block  []Step `yaml:"block,omitempty"`
+	Rescue []Step `yaml:"rescue,omitempty"`
+	Always []Step `yaml:"always,omitempty"`
 }
 
 // RetryConfig mirrors Ansible's retry/until/delay pattern.

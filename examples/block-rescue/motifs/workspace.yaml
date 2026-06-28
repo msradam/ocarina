@@ -1,0 +1,11 @@
+# A motif used as a setup fixture (the Ansible "role" analogue).
+# It provisions a clean workspace directory. The caller passes dir via with:.
+
+keys:
+  dir: /private/tmp/ocarina-workspace
+
+rondo:
+  - name: create the workspace
+    tool: create_directory
+    args:
+      path: "{{dir}}"
