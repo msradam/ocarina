@@ -97,10 +97,13 @@ Example:
 			}
 		}
 
-		// data-flow: keys available via keys: + prior echo: fields
+		// data-flow: keys available via keys:, served-rondo params:, + prior echo:
 		available := make(map[string]bool)
 		for k := range c.Keys {
 			available[k] = true
+		}
+		for _, p := range c.Params {
+			available[p.Name] = true
 		}
 
 		var totalErrs, totalWarns int
