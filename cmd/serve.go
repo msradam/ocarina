@@ -31,7 +31,7 @@ type serveOpts struct {
 
 var serveCmd = &cobra.Command{
 	Use:   "serve <rondo.yaml>...",
-	Short: "Expose rondos as composite MCP tools over stdio",
+	Short: "Expose rondos as composite MCP tools over stdio or HTTP",
 	Long: `Serves each rondo as a single MCP tool. The rondo's params: become the tool's
 input schema; calling the tool runs the rondo's steps deterministically against
 the server(s) it declares and returns the value named by return:.
