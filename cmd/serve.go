@@ -6,14 +6,24 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	jschema "github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/msradam/ocarina/internal/rondo"
 	"github.com/spf13/cobra"
 )
+
+// serveOpts bounds each served tool call: a hard duration cap and a concurrency
+// limit so a slow or flooding caller cannot exhaust subprocesses or hang.
+type serveOpts struct {
+	timeout time.Duration
+	sem     chan struct{}
+}
 
 var serveCmd = &cobra.Command{
 	Use:   "serve <rondo.yaml>...",
@@ -43,6 +53,13 @@ Example:
 			return err
 		}
 
+		timeout, _ := cmd.Flags().GetDuration("timeout")
+		maxConc, _ := cmd.Flags().GetInt("max-concurrent")
+		if maxConc < 1 {
+			maxConc = 1
+		}
+		opts := serveOpts{timeout: timeout, sem: make(chan struct{}, maxConc)}
+
 		server := mcp.NewServer(&mcp.Implementation{Name: "ocarina", Version: resolveVersion()}, nil)
 		var names []string
 		for _, path := range files {
@@ -53,12 +70,17 @@ Example:
 			if len(mf.Servers) == 0 {
 				return fmt.Errorf("%s: a served rondo must declare a server: or servers: block", path)
 			}
-			tool, handler := motifTool(mf, filepath.Dir(path), serveToolName(path, mf))
+			tool, handler := motifTool(mf, filepath.Dir(path), serveToolName(path, mf), opts)
 			server.AddTool(tool, handler)
 			names = append(names, tool.Name)
 		}
-		fmt.Fprintf(os.Stderr, "ocarina serve: %d tool(s) over stdio: %s\n", len(names), strings.Join(names, ", "))
-		return server.Run(context.Background(), &mcp.StdioTransport{})
+		fmt.Fprintf(os.Stderr, "ocarina serve: %d tool(s) over stdio (timeout %s, max-concurrent %d): %s\n",
+			len(names), timeout, maxConc, strings.Join(names, ", "))
+
+		// Shut down cleanly on Ctrl-C / SIGTERM so downstream sessions close.
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		return server.Run(ctx, &mcp.StdioTransport{})
 	},
 }
 
@@ -117,19 +139,47 @@ func motifInputSchema(params []rondo.Param) *jschema.Schema {
 	return s
 }
 
+func toolError(msg string) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
+		IsError: true,
+		Content: []mcp.Content{&mcp.TextContent{Text: msg}},
+	}
+}
+
 // motifTool builds the MCP tool and its handler for one served rondo. Each call
-// runs the rondo's steps with a fresh engine.
+// runs the rondo's steps with a fresh engine, under a concurrency limit, a hard
+// timeout, and a panic guard so one bad call cannot take down the server.
 //
 // ponytail: per-call connect (a fresh session each invocation). Pool sessions
 // if call latency against stdio servers matters.
-func motifTool(mf *rondo.File, dir, name string) (*mcp.Tool, mcp.ToolHandler) {
+func motifTool(mf *rondo.File, dir, name string, opts serveOpts) (*mcp.Tool, mcp.ToolHandler) {
 	desc := mf.Description
 	if desc == "" {
 		desc = "Runs the " + name + " rondo."
 	}
 	tool := &mcp.Tool{Name: name, Description: desc, InputSchema: motifInputSchema(mf.Params)}
 
-	handler := func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	handler := func(ctx context.Context, req *mcp.CallToolRequest) (res *mcp.CallToolResult, err error) {
+		// Bound concurrency; bail if the server is shutting down rather than block.
+		select {
+		case opts.sem <- struct{}{}:
+			defer func() { <-opts.sem }()
+		case <-ctx.Done():
+			return toolError("server shutting down"), nil
+		}
+
+		// A panic in any step must not crash the process; return it as a tool error.
+		defer func() {
+			if r := recover(); r != nil {
+				res = toolError(fmt.Sprintf("internal error running %q: %v", name, r))
+				err = nil
+			}
+		}()
+
+		// Cap the call so a hung downstream tool cannot block a slot forever.
+		ctx, cancel := context.WithTimeout(ctx, opts.timeout)
+		defer cancel()
+
 		// scope: rondo keys: are defaults, param defaults next, caller args win.
 		notes := make(map[string]string, len(mf.Keys)+len(mf.Params))
 		for k, v := range mf.Keys {
@@ -151,17 +201,14 @@ func motifTool(mf *rondo.File, dir, name string) (*mcp.Tool, mcp.ToolHandler) {
 		eng := newEngine(ctx, mf, notes)
 		defer eng.close()
 		if fails := eng.runSteps(mf.Steps, notes, dir, 0); len(fails) > 0 {
-			return &mcp.CallToolResult{
-				IsError: true,
-				Content: []mcp.Content{&mcp.TextContent{Text: strings.Join(fails, "\n")}},
-			}, nil
+			return toolError(strings.Join(fails, "\n")), nil
 		}
 
 		out := "ok"
 		if mf.Return != "" {
 			out = notes[mf.Return]
 		}
-		res := &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: out}}}
+		res = &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: out}}}
 		// surface a JSON return value as structured content too
 		var js any
 		if json.Unmarshal([]byte(out), &js) == nil {
@@ -175,5 +222,7 @@ func motifTool(mf *rondo.File, dir, name string) (*mcp.Tool, mcp.ToolHandler) {
 }
 
 func init() {
+	serveCmd.Flags().Duration("timeout", 2*time.Minute, "hard cap on a single tool call")
+	serveCmd.Flags().Int("max-concurrent", 8, "maximum concurrent tool executions")
 	rootCmd.AddCommand(serveCmd)
 }
