@@ -1,0 +1,45 @@
+# A composite MCP tool. `ocarina serve` exposes this whole rondo as a single
+# tool named provision_workspace. Calling it once runs five underlying
+# filesystem calls deterministically and returns the directory listing.
+#
+#   ocarina serve examples/serve/provision.yaml
+#
+# Then any MCP host can call provision_workspace(dir=...). To try it with
+# ocarina as the client:
+#
+#   ocarina hum ocarina serve examples/serve/provision.yaml -- \
+#     provision_workspace dir=/private/tmp/demo
+
+name: provision_workspace
+description: Create a workspace directory and seed it with three config files, then return the listing. One call instead of five.
+
+params:
+  - name: dir
+    type: string
+    required: true
+    description: Absolute path of the workspace directory to create (under /private/tmp).
+
+return: listing
+
+server:
+  command: npx
+  args: [-y, "@modelcontextprotocol/server-filesystem", /private/tmp]
+
+rondo:
+  - name: create the directory
+    tool: create_directory
+    args:
+      path: "{{dir}}"
+
+  - name: seed config files
+    tool: write_file
+    loop: '["alpha.conf", "beta.conf", "gamma.conf"]'
+    args:
+      path: "{{dir}}/{{item}}"
+      content: "managed by ocarina"
+
+  - name: list what we made
+    tool: list_directory
+    args:
+      path: "{{dir}}"
+    echo: listing

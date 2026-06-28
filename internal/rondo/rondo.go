@@ -15,9 +15,26 @@ type File struct {
 	Tasks   []Step            `yaml:"tasks,omitempty"` // Ansible-style alias; merged into Steps in Load
 	LLM     []LLMRound        `yaml:"llm,omitempty"`
 
+	// These describe a rondo when it is served as a composite MCP tool via
+	// `ocarina serve`. They are ignored during play.
+	Name        string  `yaml:"name,omitempty"`        // tool name (defaults to the file's base name)
+	Description string  `yaml:"description,omitempty"` // tool description shown to the agent
+	Params      []Param `yaml:"params,omitempty"`      // typed inputs; become the tool's inputSchema
+	Return      string  `yaml:"return,omitempty"`      // a key (set via echo:) to return as the tool result
+
 	// ServerOrder preserves the servers: insertion order for deterministic
 	// default selection when a step omits server:. Not serialized.
 	ServerOrder []string `yaml:"-"`
+}
+
+// Param declares one input of a served rondo. Type is a JSON Schema type
+// (string, number, integer, boolean); empty defaults to string.
+type Param struct {
+	Name        string `yaml:"name"`
+	Type        string `yaml:"type,omitempty"`
+	Description string `yaml:"description,omitempty"`
+	Required    bool   `yaml:"required,omitempty"`
+	Default     string `yaml:"default,omitempty"`
 }
 
 // DefaultServerKey returns the server key used by steps that omit server:.
