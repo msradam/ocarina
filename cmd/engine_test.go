@@ -39,7 +39,7 @@ func TestEngineConcurrentRuns(t *testing.T) {
 			eng := newEngine(context.Background(), file, map[string]string{})
 			// pre-seed the session so the engine does not try to spawn a process
 			eng.sessions["default"] = sessions[i]
-			eng.toolReq["default"] = map[string][]string{"echo": nil, "profile": nil, "count": nil}
+			eng.tools["default"] = map[string]toolMeta{"echo": {}, "profile": {}, "count": {}}
 			notes := map[string]string{"who": "vu"}
 			if fails := eng.runSteps(steps, notes, ".", 0); len(fails) > 0 {
 				errs[i] = fails[0]

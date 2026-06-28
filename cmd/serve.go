@@ -23,6 +23,7 @@ import (
 type serveOpts struct {
 	timeout time.Duration
 	sem     chan struct{}
+	safe    bool
 }
 
 var serveCmd = &cobra.Command{
@@ -58,7 +59,8 @@ Example:
 		if maxConc < 1 {
 			maxConc = 1
 		}
-		opts := serveOpts{timeout: timeout, sem: make(chan struct{}, maxConc)}
+		safe, _ := cmd.Flags().GetBool("safe")
+		opts := serveOpts{timeout: timeout, sem: make(chan struct{}, maxConc), safe: safe}
 
 		server := mcp.NewServer(&mcp.Implementation{Name: "ocarina", Version: resolveVersion()}, nil)
 		var names []string
@@ -199,6 +201,7 @@ func motifTool(mf *rondo.File, dir, name string, opts serveOpts) (*mcp.Tool, mcp
 		}
 
 		eng := newEngine(ctx, mf, notes)
+		eng.safe = opts.safe
 		defer eng.close()
 		if fails := eng.runSteps(mf.Steps, notes, dir, 0); len(fails) > 0 {
 			return toolError(strings.Join(fails, "\n")), nil
@@ -224,5 +227,6 @@ func motifTool(mf *rondo.File, dir, name string, opts serveOpts) (*mcp.Tool, mcp
 func init() {
 	serveCmd.Flags().Duration("timeout", 2*time.Minute, "hard cap on a single tool call")
 	serveCmd.Flags().Int("max-concurrent", 8, "maximum concurrent tool executions")
+	serveCmd.Flags().Bool("safe", false, "refuse any tool not marked read-only (override per step with allow_destructive: true)")
 	rootCmd.AddCommand(serveCmd)
 }

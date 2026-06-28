@@ -23,11 +23,18 @@ type engine struct {
 	file     *rondo.File
 	keys     map[string]string // used to interpolate server env/headers on connect
 	dryRun   bool
+	safe     bool // refuse any tool not marked readOnlyHint, unless allow_destructive
 	onlyTags map[string]struct{}
 	skipTags map[string]struct{}
 
 	sessions map[string]*mcp.ClientSession
-	toolReq  map[string]map[string][]string // server -> tool -> required args
+	tools    map[string]map[string]toolMeta // server -> tool -> metadata
+}
+
+// toolMeta is what the static pre-call check needs from a tool's schema.
+type toolMeta struct {
+	required []string
+	readOnly bool // ReadOnlyHint == true; safe to run under --safe
 }
 
 func newEngine(ctx context.Context, f *rondo.File, keys map[string]string) *engine {
@@ -36,7 +43,7 @@ func newEngine(ctx context.Context, f *rondo.File, keys map[string]string) *engi
 		file:     f,
 		keys:     keys,
 		sessions: make(map[string]*mcp.ClientSession),
-		toolReq:  make(map[string]map[string][]string),
+		tools:    make(map[string]map[string]toolMeta),
 	}
 }
 
@@ -62,20 +69,21 @@ func (e *engine) session(key string) (*mcp.ClientSession, error) {
 	}
 	e.sessions[key] = s
 	if toolsList, lerr := listAllTools(e.ctx, s); lerr == nil {
-		tools := make(map[string][]string, len(toolsList))
+		tools := make(map[string]toolMeta, len(toolsList))
 		for _, t := range toolsList {
-			var req []string
+			var meta toolMeta
 			if t.InputSchema != nil {
 				raw, _ := json.Marshal(t.InputSchema)
 				var sc struct {
 					Required []string `json:"required"`
 				}
 				_ = json.Unmarshal(raw, &sc)
-				req = sc.Required
+				meta.required = sc.Required
 			}
-			tools[t.Name] = req
+			meta.readOnly = t.Annotations != nil && t.Annotations.ReadOnlyHint
+			tools[t.Name] = meta
 		}
-		e.toolReq[key] = tools
+		e.tools[key] = tools
 	}
 	return s, nil
 }
@@ -230,14 +238,18 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 			}
 
 			// Static check against the live schema: a typo'd tool or a missing
-			// required arg is a deterministic failure, not a green run.
-			if tools, ok := e.toolReq[dispServer]; ok && step.Tool != "" {
-				req, found := tools[step.Tool]
+			// required arg is a deterministic failure, not a green run. In --safe
+			// mode also refuse any tool not marked read-only.
+			if tools, ok := e.tools[dispServer]; ok && step.Tool != "" {
+				meta, found := tools[step.Tool]
 				var schemaErr string
-				if !found {
+				switch {
+				case !found:
 					schemaErr = fmt.Sprintf("tool %q not found on server %q", step.Tool, dispServer)
-				} else {
-					for _, r := range req {
+				case e.safe && !meta.readOnly && !step.AllowDestructive:
+					schemaErr = fmt.Sprintf("tool %q is not marked read-only; refused in --safe mode (set allow_destructive: true to override)", step.Tool)
+				default:
+					for _, r := range meta.required {
 						if _, present := step.Args[r]; !present {
 							schemaErr = fmt.Sprintf("missing required arg %q for tool %q", r, step.Tool)
 							break

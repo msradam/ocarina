@@ -86,6 +86,7 @@ Example:
 		eng := newEngine(ctx, c, notes)
 		defer eng.close()
 		eng.dryRun, _ = cmd.Flags().GetBool("dry-run")
+		eng.safe, _ = cmd.Flags().GetBool("safe")
 		eng.onlyTags = onlyTags
 		eng.skipTags = skipTags
 
@@ -551,6 +552,7 @@ func renderColor(v any, indent string) string {
 
 func init() {
 	playCmd.Flags().Bool("dry-run", false, "print steps without executing them")
+	playCmd.Flags().Bool("safe", false, "refuse any tool not marked read-only (override per step with allow_destructive: true)")
 	playCmd.Flags().String("output", "text", "output format: text or json")
 	playCmd.Flags().Bool("trace", false, "log every JSON-RPC frame to stderr")
 	playCmd.Flags().StringArrayP("extra-vars", "e", nil, "override keys: variables (key=value, repeatable)")

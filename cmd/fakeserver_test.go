@@ -83,6 +83,13 @@ func newFakeSession(t *testing.T) *mcp.ClientSession {
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "ready"}}}, nil
 		})
 
+	// peek is annotated read-only, for testing the --safe gate. echo/write are not.
+	server.AddTool(&mcp.Tool{Name: "peek", Description: "read-only probe", InputSchema: objectSchema,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true}},
+		func(_ context.Context, _ *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "peeked"}}}, nil
+		})
+
 	server.AddResource(&mcp.Resource{URI: "test://greeting", Name: "greeting", MIMEType: "text/plain"},
 		func(_ context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 			return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{

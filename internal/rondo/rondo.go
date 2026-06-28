@@ -91,26 +91,27 @@ func (s *Server) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 type Step struct {
-	Name          string            `yaml:"name,omitempty"`
-	Server        string            `yaml:"server,omitempty"` // references a key in servers:
-	Motif         string            `yaml:"motif,omitempty"`  // path to a reusable rondo fragment; its steps run inline
-	With          map[string]string `yaml:"with,omitempty"`   // parameters passed to a motif, evaluated in the caller's scope
-	Tool          string            `yaml:"tool,omitempty"`
-	Resource      string            `yaml:"resource,omitempty"`
-	ListResources string            `yaml:"list_resources,omitempty"`
-	Sleep         string            `yaml:"sleep,omitempty"`
-	Args          map[string]any    `yaml:"args,omitempty"`
-	When          string            `yaml:"when,omitempty"`
-	Timeout       string            `yaml:"timeout,omitempty"`
-	Retry         *RetryConfig      `yaml:"retry,omitempty"`
-	Echo          string            `yaml:"echo,omitempty"`
-	Register      string            `yaml:"register,omitempty"` // Ansible-style alias for echo; merged in Load
-	Grab          string            `yaml:"grab,omitempty"`
-	Loop          string            `yaml:"loop,omitempty"`
-	Tags          []string          `yaml:"tags,omitempty"`
-	IgnoreErrors  bool              `yaml:"ignore_errors,omitempty"`
-	Expect        *Expect           `yaml:"expect,omitempty"`
-	Result        []ResultItem      `yaml:"result,omitempty"`
+	Name             string            `yaml:"name,omitempty"`
+	Server           string            `yaml:"server,omitempty"` // references a key in servers:
+	Motif            string            `yaml:"motif,omitempty"`  // path to a reusable rondo fragment; its steps run inline
+	With             map[string]string `yaml:"with,omitempty"`   // parameters passed to a motif, evaluated in the caller's scope
+	Tool             string            `yaml:"tool,omitempty"`
+	Resource         string            `yaml:"resource,omitempty"`
+	ListResources    string            `yaml:"list_resources,omitempty"`
+	Sleep            string            `yaml:"sleep,omitempty"`
+	Args             map[string]any    `yaml:"args,omitempty"`
+	When             string            `yaml:"when,omitempty"`
+	Timeout          string            `yaml:"timeout,omitempty"`
+	Retry            *RetryConfig      `yaml:"retry,omitempty"`
+	Echo             string            `yaml:"echo,omitempty"`
+	Register         string            `yaml:"register,omitempty"` // Ansible-style alias for echo; merged in Load
+	Grab             string            `yaml:"grab,omitempty"`
+	Loop             string            `yaml:"loop,omitempty"`
+	Tags             []string          `yaml:"tags,omitempty"`
+	IgnoreErrors     bool              `yaml:"ignore_errors,omitempty"`
+	AllowDestructive bool              `yaml:"allow_destructive,omitempty"` // run this step even under --safe
+	Expect           *Expect           `yaml:"expect,omitempty"`
+	Result           []ResultItem      `yaml:"result,omitempty"`
 
 	// block/rescue/always mirror Ansible's error handling. block runs until a
 	// step fails; rescue runs on failure (a clean rescue recovers); always runs
