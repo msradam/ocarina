@@ -1,0 +1,15 @@
+# A motif: a reusable, parameterized rondo fragment.
+# keys: are its defaults; a caller overrides them via with:.
+# A motif is isolated: it sees only its own keys: plus the with: it is passed,
+# so thread anything it needs through with:.
+
+keys:
+  zone: UTC
+
+rondo:
+  - name: probe time in zone
+    tool: get_current_time
+    args:
+      timezone: "{{zone}}"
+    expect:
+      contains: datetime

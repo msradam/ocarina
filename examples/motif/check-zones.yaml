@@ -1,0 +1,25 @@
+# Composing a rondo from motifs. Each motif: step runs the fragment's steps
+# inline; with: passes parameters, evaluated in this rondo's scope.
+#
+#   ocarina validate examples/motif/check-zones.yaml
+#   ocarina play     examples/motif/check-zones.yaml
+
+server:
+  command: uvx
+  args: [mcp-server-time]
+
+rondo:
+  - name: default zone
+    motif: motifs/time-probe.yaml
+
+  - name: tokyo
+    motif: motifs/time-probe.yaml
+    with:
+      zone: Asia/Tokyo
+
+  - name: a direct call alongside motifs
+    tool: get_current_time
+    args:
+      timezone: America/New_York
+    expect:
+      contains: timezone

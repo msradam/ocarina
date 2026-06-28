@@ -203,4 +203,21 @@ func TestResolveLoop(t *testing.T) {
 	}
 }
 
+func TestMotifNotes(t *testing.T) {
+	// A motif sees its own keys: as defaults, overridden by with: params.
+	// It does not inherit parent captures.
+	defaults := map[string]string{"token": "default-tok", "region": "us"}
+	with := map[string]string{"token": "passed-tok"}
+	n := motifNotes(defaults, with)
+	if n["token"] != "passed-tok" {
+		t.Fatalf("with: should override the default, got %q", n["token"])
+	}
+	if n["region"] != "us" {
+		t.Fatalf("unoverridden default should survive, got %q", n["region"])
+	}
+	if _, leaked := n["item"]; leaked {
+		t.Fatal("motif scope must not contain parent-only keys")
+	}
+}
+
 func boolPtr(b bool) *bool { return &b }

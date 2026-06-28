@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -113,6 +114,28 @@ Example:
 			prefix := fmt.Sprintf("  %s (%s)", name, stepLabel(step))
 
 			var errs, warns []string
+
+			// motif: a reusable fragment. Confirm the file resolves and loads;
+			// deeper recursion into its steps is a TODO.
+			if step.Motif != "" {
+				path := step.Motif
+				if !filepath.IsAbs(path) {
+					path = filepath.Join(filepath.Dir(args[0]), path)
+				}
+				if _, lerr := rondo.Load(path); lerr != nil {
+					errs = append(errs, fmt.Sprintf("motif %s: %v", step.Motif, lerr))
+				}
+				if len(errs) == 0 {
+					fmt.Fprintf(os.Stdout, "%s  %s\n", prefix, okLabel)
+				} else {
+					fmt.Fprintf(os.Stdout, "%s\n", prefix)
+					for _, e := range errs {
+						fmt.Fprintf(os.Stderr, "    %s %s\n", errLabel, e)
+					}
+				}
+				totalErrs += len(errs)
+				continue
+			}
 
 			// step must declare an action (tool, resource, list_resources, or sleep)
 			if step.Tool == "" && step.Resource == "" && step.ListResources == "" && step.Sleep == "" {

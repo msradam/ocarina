@@ -69,6 +69,29 @@ rondo:
 	}
 }
 
+func TestLoadMotifStep(t *testing.T) {
+	f := loadString(t, `
+server: {command: uvx, args: [mcp-server-time]}
+rondo:
+  - name: log in
+    motif: motifs/auth.yaml
+    with:
+      token: "{{env.TOKEN}}"
+  - tool: get_current_time
+    args: {timezone: UTC}
+`)
+	s := f.Steps[0]
+	if s.Motif != "motifs/auth.yaml" {
+		t.Fatalf("motif path = %q", s.Motif)
+	}
+	if s.With["token"] != "{{env.TOKEN}}" {
+		t.Fatalf("with: not parsed: %+v", s.With)
+	}
+	if f.Steps[1].Tool != "get_current_time" {
+		t.Fatalf("second step should be a normal tool step: %+v", f.Steps[1])
+	}
+}
+
 func TestLoadHTTPServer(t *testing.T) {
 	f := loadString(t, `
 server:
