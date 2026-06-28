@@ -273,10 +273,13 @@ func motifTool(mf *rondo.File, dir, name string, opts serveOpts) (*mcp.Tool, mcp
 			notes[k] = fmt.Sprint(v)
 		}
 
+		callStart := time.Now()
 		eng := newEngine(ctx, mf, notes)
 		eng.safe = opts.safe
 		defer eng.close()
-		if fails := eng.runSteps(mf.Steps, notes, dir, 0); len(fails) > 0 {
+		fails := eng.runSteps(mf.Steps, notes, dir, 0)
+		exportOTLP(name, summarize(eng.results, fails, time.Since(callStart)), callStart)
+		if len(fails) > 0 {
 			return toolError(strings.Join(fails, "\n")), nil
 		}
 
