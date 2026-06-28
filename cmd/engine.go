@@ -29,6 +29,21 @@ type engine struct {
 
 	sessions map[string]*mcp.ClientSession
 	tools    map[string]map[string]toolMeta // server -> tool -> metadata
+
+	results []stepResult // per-leaf-step outcomes, for the structured report
+}
+
+// rec records one leaf step's outcome.
+func (e *engine) rec(name, server string, step rondo.Step, status, msg string, start time.Time) {
+	e.results = append(e.results, stepResult{
+		Name:       name,
+		Server:     server,
+		Tool:       step.Tool,
+		Resource:   step.Resource,
+		Status:     status,
+		Message:    msg,
+		DurationMS: time.Since(start).Milliseconds(),
+	})
 }
 
 // toolMeta is what the static pre-call check needs from a tool's schema.
@@ -196,22 +211,26 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 				label += fmt.Sprintf(" [%s]", truncate(item, 40))
 			}
 			fmt.Fprintf(stdout, "%s %s\n", boldCyan("==>"), fmt.Sprintf("%s (%s)", name, label))
+			start := time.Now()
 
 			if step.When != "" {
 				ok, evalErr := condition.EvalBool(step.When, iterNotes, "")
 				if evalErr != nil {
 					fmt.Fprintf(os.Stderr, "    %s when: %v\n\n", red("error:"), evalErr)
 					fails = append(fails, fmt.Sprintf("step %q when: %v", name, evalErr))
+					e.rec(name, dispServer, step, "failed", "when: "+evalErr.Error(), start)
 					continue
 				}
 				if !ok {
 					fmt.Fprintf(stdout, "    %s\n\n", yellowPlay("skipped"))
+					e.rec(name, dispServer, step, "skipped", "", start)
 					continue
 				}
 			}
 
 			if e.dryRun {
 				fmt.Fprintf(stdout, "    [dry-run] %s\n\n", dryRunDetail(step, iterNotes))
+				e.rec(name, dispServer, step, "skipped", "dry-run", start)
 				continue
 			}
 
@@ -222,6 +241,7 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 				if parseErr != nil {
 					fmt.Fprintf(os.Stderr, "    %s invalid timeout %q: %v\n\n", red("error:"), step.Timeout, parseErr)
 					fails = append(fails, fmt.Sprintf("step %q: invalid timeout %q", name, step.Timeout))
+					e.rec(name, dispServer, step, "failed", "invalid timeout", start)
 					continue
 				}
 				stepCtx, cancelFn = context.WithTimeout(e.ctx, d)
@@ -234,6 +254,7 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 				}
 				fmt.Fprintf(os.Stderr, "    %s %v\n\n", red("error:"), sessErr)
 				fails = append(fails, fmt.Sprintf("step %q: %v", name, sessErr))
+				e.rec(name, dispServer, step, "failed", sessErr.Error(), start)
 				continue
 			}
 
@@ -260,6 +281,7 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 					if cancelFn != nil {
 						cancelFn()
 					}
+					e.rec(name, dispServer, step, "failed", schemaErr, start)
 					if step.IgnoreErrors {
 						fmt.Fprintf(stdout, "    %s %s\n\n", red("error:"), schemaErr)
 						continue
@@ -276,6 +298,7 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 			}
 			if dispatchErr != nil {
 				msg := fmt.Sprintf("    %s %v\n\n", red("error:"), dispatchErr)
+				e.rec(name, dispServer, step, "failed", dispatchErr.Error(), start)
 				if step.IgnoreErrors {
 					fmt.Fprint(stdout, msg)
 					continue
@@ -292,6 +315,7 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 				if !expectsError {
 					fmt.Fprintf(os.Stderr, "    %s %s\n\n", red("error:"), truncate(output, 200))
 					fails = append(fails, fmt.Sprintf("step %q: tool returned an error", name))
+					e.rec(name, dispServer, step, "failed", "tool returned an error", start)
 					continue
 				}
 			}
@@ -303,6 +327,7 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 					if !step.IgnoreErrors {
 						fmt.Fprintf(os.Stderr, "    %s %v\n\n", red("error:"), grabErr)
 						fails = append(fails, fmt.Sprintf("step %q: %v", name, grabErr))
+						e.rec(name, dispServer, step, "failed", grabErr.Error(), start)
 						continue
 					}
 					fmt.Fprintf(os.Stderr, "    %s %v\n", yellowPlay("grab:"), grabErr)
@@ -321,15 +346,17 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 				notes[step.Echo] = captured
 			}
 
+			status, statusMsg := "ok", ""
 			if step.Expect != nil {
-				fail := checkExpect(step.Expect, captured, isToolError, iterNotes)
-				if fail != "" {
+				if fail := checkExpect(step.Expect, captured, isToolError, iterNotes); fail != "" {
 					fmt.Fprintf(os.Stderr, "    %s %s\n", red("FAIL:"), fail)
+					status, statusMsg = "failed", fail
 					if !step.IgnoreErrors {
 						fails = append(fails, fmt.Sprintf("step %q: %s", name, fail))
 					}
 				}
 			}
+			e.rec(name, dispServer, step, status, statusMsg, start)
 
 			fmt.Fprintln(stdout)
 		}

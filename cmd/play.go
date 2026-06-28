@@ -90,14 +90,22 @@ Example:
 		eng.onlyTags = onlyTags
 		eng.skipTags = skipTags
 
+		start := time.Now()
 		failures := eng.runSteps(c.Steps, notes, filepath.Dir(args[0]), 0)
+		result := summarize(eng.results, failures, time.Since(start))
 
 		if outputJSON {
-			_ = json.NewEncoder(os.Stdout).Encode(map[string]any{
-				"ok":       len(failures) == 0,
-				"failed":   len(failures),
-				"failures": failures,
-			})
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			_ = enc.Encode(result)
+		} else {
+			tally := fmt.Sprintf("%d passed, %d failed, %d skipped in %s",
+				result.Passed, result.Failed, result.Skipped, time.Since(start).Round(time.Millisecond))
+			if result.Ok {
+				fmt.Fprintf(stdout, "%s\n", green("%s", tally))
+			} else {
+				fmt.Fprintf(stdout, "%s\n", red("%s", tally))
+			}
 		}
 		if len(failures) > 0 {
 			return fmt.Errorf("%d step(s) failed", len(failures))
