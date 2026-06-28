@@ -35,6 +35,7 @@ type engine struct {
 
 // rec records one leaf step's outcome.
 func (e *engine) rec(name, server string, step rondo.Step, status, msg string, start time.Time) {
+	end := time.Now()
 	e.results = append(e.results, stepResult{
 		Name:       name,
 		Server:     server,
@@ -42,7 +43,9 @@ func (e *engine) rec(name, server string, step rondo.Step, status, msg string, s
 		Resource:   step.Resource,
 		Status:     status,
 		Message:    msg,
-		DurationMS: time.Since(start).Milliseconds(),
+		DurationMS: end.Sub(start).Milliseconds(),
+		startedAt:  start,
+		endedAt:    end,
 	})
 }
 

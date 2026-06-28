@@ -13,6 +13,10 @@ type stepResult struct {
 	Status     string `json:"status"` // ok | failed | skipped
 	Message    string `json:"message,omitempty"`
 	DurationMS int64  `json:"duration_ms"`
+
+	// absolute span bounds for OTLP export; not serialized to the user JSON.
+	startedAt time.Time
+	endedAt   time.Time
 }
 
 // runResult is the whole-run report. Ok and Failures drive the exit code;

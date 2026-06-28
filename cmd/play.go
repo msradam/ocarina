@@ -93,6 +93,7 @@ Example:
 		start := time.Now()
 		failures := eng.runSteps(c.Steps, notes, filepath.Dir(args[0]), 0)
 		result := summarize(eng.results, failures, time.Since(start))
+		exportOTLP(filepath.Base(args[0]), result, start)
 
 		if outputJSON {
 			enc := json.NewEncoder(os.Stdout)
