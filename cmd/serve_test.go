@@ -1,12 +1,52 @@
 package cmd
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/msradam/ocarina/internal/rondo"
 )
+
+func TestBearerAuth(t *testing.T) {
+	var reached bool
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		reached = true
+		w.WriteHeader(http.StatusOK)
+	})
+	h := bearerAuth(next, "s3cret")
+
+	cases := []struct {
+		name     string
+		header   string
+		wantCode int
+		wantNext bool
+	}{
+		{"correct token", "Bearer s3cret", http.StatusOK, true},
+		{"wrong token", "Bearer nope", http.StatusUnauthorized, false},
+		{"missing header", "", http.StatusUnauthorized, false},
+		{"raw token without scheme", "s3cret", http.StatusUnauthorized, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reached = false
+			req := httptest.NewRequest(http.MethodPost, "/", nil)
+			if tc.header != "" {
+				req.Header.Set("Authorization", tc.header)
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tc.wantCode {
+				t.Fatalf("code = %d, want %d", rec.Code, tc.wantCode)
+			}
+			if reached != tc.wantNext {
+				t.Fatalf("next reached = %v, want %v", reached, tc.wantNext)
+			}
+		})
+	}
+}
 
 func TestMotifInputSchema(t *testing.T) {
 	s := motifInputSchema([]rondo.Param{

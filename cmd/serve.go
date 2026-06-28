@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -76,14 +79,84 @@ Example:
 			server.AddTool(tool, handler)
 			names = append(names, tool.Name)
 		}
-		fmt.Fprintf(os.Stderr, "ocarina serve: %d tool(s) over stdio (timeout %s, max-concurrent %d): %s\n",
-			len(names), timeout, maxConc, strings.Join(names, ", "))
+		mode := fmt.Sprintf("timeout %s, max-concurrent %d", timeout, maxConc)
+		if safe {
+			mode += ", safe"
+		}
 
 		// Shut down cleanly on Ctrl-C / SIGTERM so downstream sessions close.
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		return server.Run(ctx, &mcp.StdioTransport{})
+
+		addr, _ := cmd.Flags().GetString("http")
+		if addr == "" {
+			fmt.Fprintf(os.Stderr, "ocarina serve: %d tool(s) over stdio (%s): %s\n",
+				len(names), mode, strings.Join(names, ", "))
+			return server.Run(ctx, &mcp.StdioTransport{})
+		}
+		return serveHTTP(ctx, cmd, server, addr, mode, names)
 	},
+}
+
+// serveHTTP runs the MCP server over Streamable HTTP with optional bearer auth
+// and TLS, shutting down gracefully when ctx is cancelled.
+func serveHTTP(ctx context.Context, cmd *cobra.Command, server *mcp.Server, addr, mode string, names []string) error {
+	token, _ := cmd.Flags().GetString("token")
+	if token == "" {
+		token = os.Getenv("OCARINA_TOKEN")
+	}
+
+	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, &mcp.StreamableHTTPOptions{Stateless: true})
+	var handler http.Handler = mcpHandler
+	auth := "no auth"
+	if token != "" {
+		handler = bearerAuth(mcpHandler, token)
+		auth = "bearer token"
+	}
+
+	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}
+	// Shutdown needs a fresh deadline: the parent ctx is already cancelled, since
+	// its cancellation is exactly what triggers this shutdown.
+	go func() { //#nosec G118 -- intentional: parent ctx is the shutdown signal
+		<-ctx.Done()
+		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutCtx)
+	}()
+
+	cert, _ := cmd.Flags().GetString("tls-cert")
+	key, _ := cmd.Flags().GetString("tls-key")
+	scheme := "http"
+	if cert != "" && key != "" {
+		scheme = "https"
+	}
+	fmt.Fprintf(os.Stderr, "ocarina serve: %d tool(s) over %s %s (%s, %s): %s\n",
+		len(names), scheme, addr, auth, mode, strings.Join(names, ", "))
+
+	var err error
+	if cert != "" && key != "" {
+		err = srv.ListenAndServeTLS(cert, key)
+	} else {
+		err = srv.ListenAndServe()
+	}
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
+}
+
+// bearerAuth rejects requests without a matching Authorization: Bearer token,
+// comparing in constant time.
+func bearerAuth(next http.Handler, token string) http.Handler {
+	want := []byte("Bearer " + token)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got := []byte(r.Header.Get("Authorization"))
+		if subtle.ConstantTimeCompare(got, want) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // collectServeFiles expands directory arguments to their .yaml/.yml entries.
@@ -228,5 +301,9 @@ func init() {
 	serveCmd.Flags().Duration("timeout", 2*time.Minute, "hard cap on a single tool call")
 	serveCmd.Flags().Int("max-concurrent", 8, "maximum concurrent tool executions")
 	serveCmd.Flags().Bool("safe", false, "refuse any tool not marked read-only (override per step with allow_destructive: true)")
+	serveCmd.Flags().String("http", "", "serve over HTTP at this address (e.g. :8080) instead of stdio")
+	serveCmd.Flags().String("token", "", "require this bearer token over HTTP (or set OCARINA_TOKEN)")
+	serveCmd.Flags().String("tls-cert", "", "TLS certificate file (enables HTTPS with --tls-key)")
+	serveCmd.Flags().String("tls-key", "", "TLS key file (enables HTTPS with --tls-cert)")
 	rootCmd.AddCommand(serveCmd)
 }
