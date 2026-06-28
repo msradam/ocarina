@@ -282,14 +282,20 @@
       <a class="lk-nav-item" href="#rondo">Rondo format</a>
       <a class="lk-nav-item nav-sub-item" href="#multi-server">Multiple servers</a>
       <a class="lk-nav-item nav-sub-item" href="#remote">Remote servers</a>
+      <a class="lk-nav-item" href="#motifs">Motifs</a>
+      <a class="lk-nav-item" href="#error-handling">Error handling</a>
       <a class="lk-nav-item" href="#commands">Commands</a>
       <a class="lk-nav-item nav-sub-item" href="#docs">docs</a>
       <a class="lk-nav-item nav-sub-item" href="#record">record</a>
       <a class="lk-nav-item nav-sub-item" href="#play">play</a>
+      <a class="lk-nav-item nav-sub-item" href="#serve">serve</a>
       <a class="lk-nav-item nav-sub-item" href="#validate">validate</a>
       <a class="lk-nav-item nav-sub-item" href="#diff">diff</a>
       <a class="lk-nav-item nav-sub-item" href="#lock">lock</a>
+      <a class="lk-nav-item nav-sub-item" href="#load">load</a>
       <a class="lk-nav-item nav-sub-item" href="#hum">hum</a>
+      <a class="lk-nav-item" href="#safe">Safe mode</a>
+      <a class="lk-nav-item" href="#output">Output</a>
       <a class="lk-nav-item" href="#examples">Examples</a>
       <a class="lk-nav-item" href="#showcases">Showcases</a>
       <a class="lk-nav-item" href="#ci">Use in CI</a>
@@ -316,7 +322,7 @@
 
         <div class="lk-running-head" style="margin-bottom:var(--space-5)">
           <span class="lk-eyebrow">Ocarina</span>
-          <span class="lk-eyebrow">v0.1</span>
+          <span class="lk-eyebrow">v0.3</span>
         </div>
 
         <svg class="hero-icon" viewBox="0 0 200 200" aria-hidden="true">
@@ -521,6 +527,9 @@ rondo:
           <tr><td><code class="lk-code-inline">retry</code></td><td><code class="lk-code-inline">retries</code>, <code class="lk-code-inline">delay</code>, and <code class="lk-code-inline">until:</code> (CEL). Re-run until the condition holds.</td></tr>
           <tr><td><code class="lk-code-inline">tags</code></td><td>Label the step for <code class="lk-code-inline">--tags</code> / <code class="lk-code-inline">--skip-tags</code> filtering.</td></tr>
           <tr><td><code class="lk-code-inline">ignore_errors</code></td><td>Continue past a failing step instead of failing the run.</td></tr>
+          <tr><td><code class="lk-code-inline">allow_destructive</code></td><td>Run this step even under <code class="lk-code-inline">--safe</code>. See <a class="lk-link" href="#safe">Safe mode</a>.</td></tr>
+          <tr><td><code class="lk-code-inline">motif</code></td><td>Path to a reusable fragment whose steps run inline. Pass parameters with <code class="lk-code-inline">with:</code>. See <a class="lk-link" href="#motifs">Motifs</a>.</td></tr>
+          <tr><td><code class="lk-code-inline">block</code> / <code class="lk-code-inline">rescue</code> / <code class="lk-code-inline">always</code></td><td>Error handling. The block runs until a step fails, <code class="lk-code-inline">rescue</code> runs on failure, <code class="lk-code-inline">always</code> runs regardless. See <a class="lk-link" href="#error-handling">Error handling</a>.</td></tr>
         </tbody>
       </table>
 
@@ -577,9 +586,79 @@ rondo:
       </div>
     </section>
 
+    <!-- Motifs -->
+    <section class="docs-section" id="motifs">
+      <div class="lk-running-head"><span class="lk-eyebrow">04</span><span class="lk-eyebrow">Motifs</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Motifs: reusable fragments</h2>
+
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">A motif is a reusable, parameterized rondo fragment. Write a login flow or a setup routine once, then pull it into any rondo with <code class="lk-code-inline">motif:</code> and pass parameters with <code class="lk-code-inline">with:</code>. It is the Ansible role, or the pytest fixture, for rondos.</p>
+
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed);margin-top:var(--space-4)">A motif runs in an isolated scope. It sees its own <code class="lk-code-inline">keys:</code> as defaults, overlaid by the <code class="lk-code-inline">with:</code> values the caller passes. It does not inherit the parent's other variables, so thread in anything it needs through <code class="lk-code-inline">with:</code>.</p>
+
+      <div class="code-wrap" style="margin-top:var(--space-3)">
+        <div class="code-label">motifs/time-probe.yaml</div>
+        <pre><code class="language-yaml">keys:
+  zone: UTC          # a default, overridable via with:
+
+rondo:
+  - tool: get_current_time
+    args:
+      timezone: "{{zone}}"
+    expect:
+      contains: datetime</code></pre>
+      </div>
+
+      <div class="code-wrap" style="margin-top:var(--space-3)">
+        <div class="code-label">check-zones.yaml</div>
+        <pre><code class="language-yaml">server:
+  command: uvx
+  args: [mcp-server-time]
+
+rondo:
+  - name: default zone
+    motif: motifs/time-probe.yaml
+
+  - name: tokyo
+    motif: motifs/time-probe.yaml
+    with:
+      zone: Asia/Tokyo</code></pre>
+      </div>
+
+      <p style="color:var(--text-muted);font-size:var(--type-sm);margin-top:var(--space-4)">A motif runs against the including rondo's servers. See <a class="lk-link" href="https://github.com/msradam/ocarina/tree/main/examples/motif" target="_blank" rel="noopener">examples/motif</a>.</p>
+    </section>
+
+    <!-- Error handling -->
+    <section class="docs-section" id="error-handling">
+      <div class="lk-running-head"><span class="lk-eyebrow">05</span><span class="lk-eyebrow">Error handling</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Error handling: block, rescue, always</h2>
+
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">A step can hold a <code class="lk-code-inline">block:</code> of steps with a <code class="lk-code-inline">rescue:</code> and an <code class="lk-code-inline">always:</code>, the same construct Ansible uses. The block runs until a step fails. On a failure, <code class="lk-code-inline">rescue:</code> runs; if the rescue is clean, the failure is handled and the run continues with exit 0. <code class="lk-code-inline">always:</code> runs either way, so it is where teardown belongs. Paired with a motif for setup, this is a fixture: stand up state, assert against it, tear it down even on failure.</p>
+
+      <div class="code-wrap" style="margin-top:var(--space-3)">
+        <div class="code-label">provision.yaml</div>
+        <pre><code class="language-yaml">rondo:
+  - name: provision then verify, roll back on failure
+    block:
+      - tool: read_text_file
+        args: {path: "{{dir}}/config.json"}
+      - tool: read_text_file
+        args: {path: "{{dir}}/missing.json"}   # fails here
+      - tool: write_file                         # never runs
+        args: {path: "{{dir}}/ok", content: ok}
+    rescue:
+      - tool: write_file
+        args: {path: "{{dir}}/ROLLBACK", content: "recovered"}
+    always:
+      - tool: list_directory
+        args: {path: "{{dir}}"}</code></pre>
+      </div>
+
+      <p style="color:var(--text-muted);font-size:var(--type-sm);margin-top:var(--space-4)"><a class="lk-link" href="https://github.com/msradam/ocarina/tree/main/examples/block-rescue" target="_blank" rel="noopener">examples/block-rescue</a> mirrors the canonical Ansible blocks playbook one to one.</p>
+    </section>
+
     <!-- Commands -->
     <section class="docs-section" id="commands">
-      <div class="lk-running-head"><span class="lk-eyebrow">04</span><span class="lk-eyebrow">Commands</span></div>
+      <div class="lk-running-head"><span class="lk-eyebrow">06</span><span class="lk-eyebrow">Commands</span></div>
       <h2 class="lk-h2" style="margin:var(--space-4) 0">Commands</h2>
 
       <!-- docs -->
@@ -641,6 +720,50 @@ ocarina play examples/time-zones.yaml -e owner=acme --tags smoke</code></pre>
         </table>
       </div>
 
+      <!-- serve -->
+      <div class="cmd-block" id="serve" style="margin-top:var(--space-6)">
+        <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">serve</p>
+        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina serve &lt;rondo.yaml&gt;...</h3>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Exposes a rondo as a single MCP tool. The rondo's <code class="lk-code-inline">params:</code> become the tool's input schema, <code class="lk-code-inline">return:</code> names the result, and the rondo's own <code class="lk-code-inline">server:</code> is the downstream it drives. This mints a custom, deterministic, higher-level tool for any MCP server without touching that server's code, the way a stored procedure wraps several queries behind one call. An agent calls it once instead of orchestrating the underlying steps itself.</p>
+        <div class="code-wrap">
+          <div class="code-label">provision.yaml</div>
+          <pre><code class="language-yaml">name: provision_workspace
+description: Create a workspace and seed it with config files. One call instead of five.
+params:
+  - name: dir
+    type: string
+    required: true
+return: listing
+server:
+  command: npx
+  args: [-y, "@modelcontextprotocol/server-filesystem", /private/tmp]
+rondo:
+  - tool: create_directory
+    args: {path: "{{dir}}"}
+  - tool: write_file
+    loop: '["alpha.conf", "beta.conf", "gamma.conf"]'
+    args: {path: "{{dir}}/{{item}}", content: "managed by ocarina"}
+  - tool: list_directory
+    args: {path: "{{dir}}"}
+    echo: listing</code></pre>
+        </div>
+        <div class="code-wrap">
+          <div class="code-label">terminal</div>
+          <pre><code class="language-bash">ocarina serve provision.yaml                  # stdio (default)
+ocarina serve provision.yaml --http :8080     # Streamable HTTP</code></pre>
+        </div>
+        <p style="color:var(--text-body);margin:var(--space-3) 0 var(--space-2);font-size:var(--type-sm)"><strong>Flags</strong></p>
+        <table class="field-table" style="max-width:560px">
+          <tbody>
+            <tr><td><code class="lk-code-inline">--http ADDR</code></td><td>Serve over Streamable HTTP at this address instead of stdio.</td></tr>
+            <tr><td><code class="lk-code-inline">--token</code></td><td>Require a bearer token over HTTP (or set <code class="lk-code-inline">OCARINA_TOKEN</code>).</td></tr>
+            <tr><td><code class="lk-code-inline">--tls-cert</code> / <code class="lk-code-inline">--tls-key</code></td><td>Enable HTTPS.</td></tr>
+            <tr><td><code class="lk-code-inline">--safe</code></td><td>Refuse any tool not marked read-only. See <a class="lk-link" href="#safe">Safe mode</a>.</td></tr>
+            <tr><td><code class="lk-code-inline">--timeout</code> / <code class="lk-code-inline">--max-concurrent</code></td><td>Per-call deadline and concurrency limit. A panic in one call cannot take the server down.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
       <!-- validate -->
       <div class="cmd-block" id="validate" style="margin-top:var(--space-6)">
         <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">validate</p>
@@ -675,6 +798,27 @@ ocarina lock audit.yaml --check   # fail if the live schema drifted</code></pre>
         </div>
       </div>
 
+      <!-- load -->
+      <div class="cmd-block" id="load" style="margin-top:var(--space-6)">
+        <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">load</p>
+        <h3 class="lk-h3" style="margin:0 0 var(--space-3)">ocarina load &lt;rondo.yaml&gt;</h3>
+        <p style="color:var(--text-body);margin-bottom:var(--space-4)">Runs a rondo's tool steps as a load test: many virtual users loop the scenario concurrently, for a duration or an iteration count. Reports throughput and latency percentiles, like k6. A <code class="lk-code-inline">--threshold</code> turns a percentile into a pass/fail gate, so it works as a CI performance check. This measures behavior under concurrency on purpose, so unlike <code class="lk-code-inline">play</code> it is not deterministic.</p>
+        <div class="code-wrap">
+          <div class="code-label">terminal</div>
+          <pre><code class="language-bash">ocarina load smoke.yaml --vus 50 --duration 30s
+ocarina load smoke.yaml --vus 20 --iterations 1000 --threshold p95&lt;500ms</code></pre>
+        </div>
+        <p style="color:var(--text-body);margin:var(--space-3) 0 var(--space-2);font-size:var(--type-sm)"><strong>Flags</strong></p>
+        <table class="field-table" style="max-width:560px">
+          <tbody>
+            <tr><td><code class="lk-code-inline">--vus</code></td><td>Number of concurrent virtual users.</td></tr>
+            <tr><td><code class="lk-code-inline">--duration</code></td><td>How long to run (ignored when <code class="lk-code-inline">--iterations</code> is set).</td></tr>
+            <tr><td><code class="lk-code-inline">--iterations</code></td><td>Total scenario iterations across all virtual users.</td></tr>
+            <tr><td><code class="lk-code-inline">--threshold</code></td><td>Fail if a latency percentile is exceeded, e.g. <code class="lk-code-inline">p95&lt;500ms</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
       <!-- hum -->
       <div class="cmd-block" id="hum" style="margin-top:var(--space-6)">
         <p class="lk-eyebrow" style="margin:0 0 var(--space-2)">hum</p>
@@ -688,9 +832,40 @@ ocarina hum npx -y @modelcontextprotocol/server-github -- list_commits owner=pyt
       </div>
     </section>
 
+    <!-- Safe mode -->
+    <section class="docs-section" id="safe">
+      <div class="lk-running-head"><span class="lk-eyebrow">07</span><span class="lk-eyebrow">Safe mode</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Safe mode</h2>
+
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)"><code class="lk-code-inline">play --safe</code> and <code class="lk-code-inline">serve --safe</code> refuse any tool not marked read-only in its MCP annotations (<code class="lk-code-inline">readOnlyHint</code>). A step opts back in with <code class="lk-code-inline">allow_destructive: true</code>. This keeps a read-only rondo from making a write when you point it at a server you do not fully control.</p>
+
+      <div class="code-wrap" style="margin-top:var(--space-3)">
+        <div class="code-label">terminal</div>
+        <pre><code class="language-bash">ocarina play audit.yaml --safe</code></pre>
+      </div>
+
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed);margin-top:var(--space-4)">This is a guardrail, not a security boundary. MCP annotations are advisory, and a server is free to misreport them, so treat <code class="lk-code-inline">--safe</code> as protection against mistakes, not against a hostile server.</p>
+    </section>
+
+    <!-- Output -->
+    <section class="docs-section" id="output">
+      <div class="lk-running-head"><span class="lk-eyebrow">08</span><span class="lk-eyebrow">Output</span></div>
+      <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Output</h2>
+
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)"><code class="lk-code-inline">play</code> prints a per-step run and a final tally. Two open output surfaces let other tools consume a run without Ocarina shipping format-specific reporters.</p>
+
+      <table class="field-table" style="margin-top:var(--space-4)">
+        <tbody>
+          <tr><td><code class="lk-code-inline">--output json</code></td><td>A structured result: per-step status, message, and duration, plus the run total. Transform it into JUnit, a dashboard, or anything else.</td></tr>
+          <tr><td><code class="lk-code-inline">OTEL_EXPORTER_OTLP_ENDPOINT</code></td><td>Set this env var and the run exports as OpenTelemetry traces (a span per step) over OTLP. Any OTLP backend (Jaeger, Tempo, Honeycomb, Datadog) ingests it. Standard library only, so it adds no dependencies.</td></tr>
+          <tr><td><code class="lk-code-inline">--trace</code></td><td>Log every JSON-RPC frame to stderr for debugging.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
     <!-- Examples -->
     <section class="docs-section" id="examples">
-      <div class="lk-running-head"><span class="lk-eyebrow">05</span><span class="lk-eyebrow">Examples</span></div>
+      <div class="lk-running-head"><span class="lk-eyebrow">09</span><span class="lk-eyebrow">Examples</span></div>
       <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Examples</h2>
       <p style="color:var(--text-body);margin-bottom:var(--space-4)">Working rondos in <code class="lk-code-inline">examples/</code>, each verified against a live server.</p>
 
@@ -699,6 +874,21 @@ ocarina hum npx -y @modelcontextprotocol/server-github -- list_commits owner=pyt
           <tr><th>File</th><th>Server</th><th>What it shows</th></tr>
         </thead>
         <tbody>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/tree/main/examples/motif" target="_blank">motif/</a></td>
+            <td><code class="lk-code-inline">uvx mcp-server-time</code></td>
+            <td>A reusable fragment pulled into a rondo with <code class="lk-code-inline">with:</code> overrides</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/tree/main/examples/block-rescue" target="_blank">block-rescue/</a></td>
+            <td><code class="lk-code-inline">server-filesystem</code></td>
+            <td><code class="lk-code-inline">block</code> / <code class="lk-code-inline">rescue</code> / <code class="lk-code-inline">always</code>, mirroring an Ansible playbook</td>
+          </tr>
+          <tr>
+            <td><a class="lk-link" href="https://github.com/msradam/ocarina/tree/main/examples/serve" target="_blank">serve/provision.yaml</a></td>
+            <td><code class="lk-code-inline">server-filesystem</code></td>
+            <td>A composite tool: five filesystem calls behind one <code class="lk-code-inline">serve</code> tool</td>
+          </tr>
           <tr>
             <td><a class="lk-link" href="https://github.com/msradam/ocarina/blob/main/examples/fetch-demo.yaml" target="_blank">fetch-demo.yaml</a></td>
             <td><code class="lk-code-inline">uvx mcp-server-fetch</code></td>
@@ -750,7 +940,7 @@ ocarina hum npx -y @modelcontextprotocol/server-github -- list_commits owner=pyt
 
     <!-- Showcases -->
     <section class="docs-section" id="showcases">
-      <div class="lk-running-head"><span class="lk-eyebrow">06</span><span class="lk-eyebrow">Showcases</span></div>
+      <div class="lk-running-head"><span class="lk-eyebrow">10</span><span class="lk-eyebrow">Showcases</span></div>
       <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Showcases</h2>
       <p style="color:var(--text-body);margin-bottom:var(--space-4)">Standalone repositories you can clone and run, each a real working environment for a different MCP server.</p>
 
@@ -781,7 +971,7 @@ ocarina hum npx -y @modelcontextprotocol/server-github -- list_commits owner=pyt
 
     <!-- CI -->
     <section class="docs-section" id="ci">
-      <div class="lk-running-head"><span class="lk-eyebrow">07</span><span class="lk-eyebrow">Use in CI</span></div>
+      <div class="lk-running-head"><span class="lk-eyebrow">11</span><span class="lk-eyebrow">Use in CI</span></div>
       <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">Use in CI</h2>
 
       <p style="color:var(--text-body);margin-bottom:var(--space-4)"><code class="lk-code-inline">play</code> exits 0 if all expectations pass, non-zero otherwise. No API keys needed.</p>
@@ -806,7 +996,7 @@ jobs:
 
     <!-- Scope -->
     <section class="docs-section" id="scope">
-      <div class="lk-running-head"><span class="lk-eyebrow">08</span><span class="lk-eyebrow">Scope</span></div>
+      <div class="lk-running-head"><span class="lk-eyebrow">12</span><span class="lk-eyebrow">Scope</span></div>
       <h2 class="lk-h2" style="margin:var(--space-4) 0 var(--space-3)">What MCP makes easy, and what it does not yet</h2>
 
       <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">Ocarina works because MCP gives every server the same shape: named tools with typed arguments, reachable over one protocol. Learn the grammar once and you can drive a time server, a GitHub server, a Postgres database, and a 3D modeling app with the same YAML. You point Ocarina at a server, fill in the calls, and it runs them the same way on every execution. That part is solid today.</p>
@@ -818,7 +1008,7 @@ jobs:
       <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed);margin-top:var(--space-4)">So the honest scope. Ocarina is an automation framework for the MCP servers that behave like clean RPC, and a deterministic test harness for the ones that do not. Today that means smoke tests in CI and scripts that chain a few well-behaved servers. Recording a session and replaying it without a model works now too. The reach grows as the ecosystem matures and servers return more structure. The Blender demo on the home page is the far end of what is already possible. The rough edges above are the near end you will actually hit.</p>
 
       <h3 class="lk-h3" style="margin:var(--space-6) 0 var(--space-3)">What Ocarina is not</h3>
-      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">It does not score LLM outputs, compare models, or track token costs. It connects to the real server on every <code class="lk-code-inline">play</code> run, so a broken server breaks the replay. It runs one linear pass with no scheduler and no state carried between runs. The output is stdout and an exit code.</p>
+      <p style="color:var(--text-body);max-width:60ch;line-height:var(--lh-relaxed)">It does not score LLM outputs, compare models, or track token costs. It connects to the real server on every <code class="lk-code-inline">play</code> run, so a broken server breaks the replay. <code class="lk-code-inline">play</code> runs one linear pass with no scheduler and no state carried between runs. The output is stdout and an exit code, a structured JSON report, or OpenTelemetry traces.</p>
 
       <div class="lk-measure" style="margin:var(--space-6) 0"><span class="lk-measure-line" style="width:60px"></span><span class="lk-measure-gap"></span><span class="lk-measure-hatch"></span></div>
 
