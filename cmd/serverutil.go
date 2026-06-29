@@ -63,12 +63,22 @@ func listAllTools(ctx context.Context, sess *mcp.ClientSession) ([]*mcp.Tool, er
 // play's lazy connect). Undefined references are reported per-step, not here.
 func referencedServerKeys(f *rondo.File) map[string]bool {
 	keys := make(map[string]bool)
-	for _, step := range f.Steps {
-		if step.Tool == "" && step.Resource == "" && step.ListResources == "" {
-			continue
+	var walk func(steps []rondo.Step)
+	walk = func(steps []rondo.Step) {
+		for _, step := range steps {
+			if len(step.Block) > 0 || len(step.Rescue) > 0 || len(step.Always) > 0 {
+				walk(step.Block)
+				walk(step.Rescue)
+				walk(step.Always)
+				continue
+			}
+			if step.Tool == "" && step.Resource == "" && step.ListResources == "" {
+				continue
+			}
+			keys[f.StepServerKey(step)] = true
 		}
-		keys[f.StepServerKey(step)] = true
 	}
+	walk(f.Steps)
 	return keys
 }
 
