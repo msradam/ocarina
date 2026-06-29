@@ -232,11 +232,34 @@ func callTool(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, not
 	// Prefer structured output when the server provides it: grab/echo/expect
 	// then operate on typed JSON instead of parsing the text block.
 	if result.StructuredContent != nil {
-		if b, err := json.Marshal(result.StructuredContent); err == nil {
+		if b, err := json.Marshal(unwrapStructured(result.StructuredContent)); err == nil {
 			return string(b), result.IsError, nil
 		}
 	}
 	return strings.Join(parts, "\n"), result.IsError, nil
+}
+
+// unwrapStructured undoes FastMCP's wrap_result envelope. FastMCP wraps a tool
+// return that is not already a JSON object as {"result": <value>}, and when the
+// value is itself a JSON string (e.g. mcp-server-motherduck returning rows as
+// serialized JSON) the real payload is double-encoded. Unwrap that one shape so
+// grab paths see the actual object; leave every other structuredContent alone.
+func unwrapStructured(sc any) any {
+	m, ok := sc.(map[string]any)
+	if !ok || len(m) != 1 {
+		return sc
+	}
+	// Only the unambiguous double-encoded shape: a single "result" key holding a
+	// JSON string. A genuine {"result": {...}} object output is left untouched.
+	s, ok := m["result"].(string)
+	if !ok {
+		return sc
+	}
+	var parsed any
+	if json.Unmarshal([]byte(s), &parsed) == nil {
+		return parsed
+	}
+	return sc
 }
 
 func readResource(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, notes map[string]string) (string, bool, error) {
