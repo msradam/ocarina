@@ -320,7 +320,7 @@ A composite GitHub Action installs Ocarina and replays a rondo:
     rondo: tests/mcp-smoke.yaml
 ```
 
-See [`action.yml`](action.yml).
+See [`action.yml`](action.yml), and the [CI testing guide](docs/testing.md) for the full workflow: snapshots, latency gates, data-driven runs, and a JUnit report.
 
 ## Examples
 
