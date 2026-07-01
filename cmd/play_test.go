@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/msradam/ocarina/internal/interp"
 	"github.com/msradam/ocarina/internal/rondo"
@@ -108,10 +109,14 @@ func TestCheckExpect(t *testing.T) {
 		{"is_error fail", rondo.Expect{IsError: boolPtr(true)}, "fine", false, false},
 		{"rule pass", rondo.Expect{Rule: `output == "42"`}, "42", false, true},
 		{"rule fail", rondo.Expect{Rule: `output == "42"`}, "41", false, false},
+		{"max_duration pass", rondo.Expect{MaxDuration: "500ms"}, "ok", false, true},
+		{"max_duration fail", rondo.Expect{MaxDuration: "1ms"}, "ok", false, false},
+		{"max_duration negative rejected", rondo.Expect{MaxDuration: "-1s"}, "ok", false, false},
+		{"unresolved contains rejected", rondo.Expect{Contains: "{{missing}}"}, "anything", false, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			fail := checkExpect(&tc.expect, tc.output, tc.isErr, map[string]string{})
+			fail := checkExpect(&tc.expect, tc.output, tc.isErr, 10*time.Millisecond, map[string]string{})
 			if (fail == "") != tc.wantOK {
 				t.Fatalf("wantOK=%v, got failure=%q", tc.wantOK, fail)
 			}
@@ -126,7 +131,7 @@ func TestRetryUntilMatches(t *testing.T) {
 		Tool:  "count",
 		Retry: &rondo.RetryConfig{Retries: 5, Delay: "1ms", Until: `output == "3"`},
 	}
-	out, _, err := runWithRetry(context.Background(), sess, step, map[string]string{})
+	out, _, _, err := runWithRetry(context.Background(), sess, step, map[string]string{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +145,7 @@ func TestRetryRecoversFromToolError(t *testing.T) {
 	// flaky fails twice then succeeds; the default retry path keeps going while
 	// isError is true and stops once the call is clean.
 	step := rondo.Step{Tool: "flaky", Retry: &rondo.RetryConfig{Retries: 5, Delay: "1ms"}}
-	out, isErr, err := runWithRetry(context.Background(), sess, step, map[string]string{})
+	out, isErr, _, err := runWithRetry(context.Background(), sess, step, map[string]string{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,9 +161,18 @@ func TestRetryExhaustedFails(t *testing.T) {
 	sess := newFakeSession(t)
 	// boom never recovers; retries exhaust and the step fails.
 	step := rondo.Step{Tool: "boom", Retry: &rondo.RetryConfig{Retries: 2, Delay: "1ms", Until: `output == "never"`}}
-	_, _, err := runWithRetry(context.Background(), sess, step, map[string]string{})
+	_, _, _, err := runWithRetry(context.Background(), sess, step, map[string]string{})
 	if err == nil {
 		t.Fatal("exhausted retries must return an error")
+	}
+}
+
+func TestRetryBadDelayErrors(t *testing.T) {
+	sess := newFakeSession(t)
+	// a bad delay must fail loudly, not silently fall back to the 5s default.
+	step := rondo.Step{Tool: "count", Retry: &rondo.RetryConfig{Retries: 1, Delay: "banana", Until: `output == "never"`}}
+	if _, _, _, err := runWithRetry(context.Background(), sess, step, map[string]string{}); err == nil {
+		t.Fatal("bad retry delay must return an error")
 	}
 }
 

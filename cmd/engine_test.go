@@ -9,6 +9,74 @@ import (
 	"github.com/msradam/ocarina/internal/rondo"
 )
 
+// TestSetComputesVars proves a set: step computes vars via CEL (including a
+// sibling reference, which resolves because keys evaluate in sorted order) and
+// that a later step can interpolate the result.
+func TestSetComputesVars(t *testing.T) {
+	file := &rondo.File{
+		Servers:     map[string]rondo.Server{"default": {Command: "fake"}},
+		ServerOrder: []string{"default"},
+	}
+	steps := []rondo.Step{
+		{Name: "compute", Set: map[string]string{"city": "'Tokyo'", "zone": "'Asia/' + city"}},
+		{Name: "use", Tool: "echo", Args: map[string]any{"text": "{{zone}}"}, Expect: &rondo.Expect{Contains: "Asia/Tokyo"}},
+	}
+
+	eng := newEngine(context.Background(), file, map[string]string{})
+	eng.sessions["default"] = newFakeSession(t)
+	eng.tools["default"] = map[string]toolMeta{"echo": {}}
+	notes := map[string]string{}
+	if fails := eng.runSteps(steps, notes, ".", 0); len(fails) > 0 {
+		t.Fatalf("set/use failed: %v", fails)
+	}
+	if notes["zone"] != "Asia/Tokyo" {
+		t.Fatalf("zone = %q, want Asia/Tokyo", notes["zone"])
+	}
+}
+
+// TestSnapshotAssertAndUpdate covers the three snapshot paths: a matching
+// baseline passes, a mismatching one fails, and --update captures a baseline
+// back into the step slice (which play then saves).
+func TestSnapshotAssertAndUpdate(t *testing.T) {
+	file := &rondo.File{
+		Servers:     map[string]rondo.Server{"default": {Command: "fake"}},
+		ServerOrder: []string{"default"},
+	}
+	mk := func() *engine {
+		e := newEngine(context.Background(), file, map[string]string{})
+		e.sessions["default"] = newFakeSession(t)
+		e.tools["default"] = map[string]toolMeta{"echo": {}}
+		e.snapshot = true
+		return e
+	}
+
+	pass := []rondo.Step{{Tool: "echo", Args: map[string]any{"text": "fixed"},
+		Result: []rondo.ResultItem{{Type: "text", Text: "fixed"}}}}
+	if f := mk().runSteps(pass, map[string]string{}, ".", 0); len(f) > 0 {
+		t.Fatalf("matching snapshot should pass, got %v", f)
+	}
+
+	fail := []rondo.Step{{Tool: "echo", Args: map[string]any{"text": "fixed"},
+		Result: []rondo.ResultItem{{Type: "text", Text: "different"}}}}
+	if f := mk().runSteps(fail, map[string]string{}, ".", 0); len(f) == 0 {
+		t.Fatal("mismatching snapshot should fail")
+	}
+
+	upd := []rondo.Step{{Tool: "echo", Args: map[string]any{"text": "captured"}}}
+	e := mk()
+	e.update = true
+	e.runSteps(upd, map[string]string{}, ".", 0)
+	if len(upd[0].Result) != 1 || upd[0].Result[0].Text != "captured" {
+		t.Fatalf("update should capture baseline into the step, got %+v", upd[0].Result)
+	}
+
+	// --snapshot on a step with no baseline must fail, not pass vacuously.
+	nobase := []rondo.Step{{Tool: "echo", Args: map[string]any{"text": "x"}}}
+	if f := mk().runSteps(nobase, map[string]string{}, ".", 0); len(f) == 0 {
+		t.Fatal("snapshot with no baseline should fail")
+	}
+}
+
 // TestEngineConcurrentRuns proves serve's execution model is race-free: many
 // engines run the same rondo in parallel, each with its own session and notes.
 // Run under -race. Sessions are built on the main goroutine because t.Fatal is

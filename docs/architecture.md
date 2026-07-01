@@ -12,8 +12,8 @@ Ocarina is a YAML-driven automation framework for MCP servers. It sits in the sa
 │    Parser      YAML  →  File                            │
 │    Engine      step runner · when · loop · retry        │
 │                motif · block / rescue / always          │
-│    Assert      grab · echo · expect · --safe            │
-│    Report      text · --output json · OTLP traces       │
+│    Assert      grab · echo · expect · snapshot · --safe │
+│    Report      text · json · junit · OTLP traces        │
 │    MCP client  initialize → tools/list → tools/call     │
 └────────────────────────────┬────────────────────────────┘
                              │   stdio  or  Streamable HTTP
@@ -38,6 +38,7 @@ Every Ocarina feature maps to a specific MCP method. Nothing is invented outside
 | `resource:` | `resources/read` | The URI is interpolated from `keys:` and prior captures. |
 | `list_resources:` | `resources/list` | Returns a JSON array of URIs, usable by `grab:`, `echo:`, and `loop:`. |
 | `sleep:` | none | A local pause to pace a run. No protocol call. |
+| `set:` | none | Compute vars from CEL expressions without a call (Ansible `set_fact`). Keys evaluate in sorted order, so one can reference another. |
 | `motif:` | none | Include another rondo file inline (see Composition). |
 | `block:` / `rescue:` / `always:` | none | Error handling over a nested step list (see Composition). |
 
@@ -49,8 +50,9 @@ Every Ocarina feature maps to a specific MCP method. Nothing is invented outside
 | `matches: "regex"` | regex over the text content |
 | `equals: "str"` | exact match (whitespace-trimmed) |
 | `is_error: bool` | `CallToolResult.isError` |
-| `rule: "CEL"` | a CEL boolean over `output` and the current variables |
+| `rule: "CEL"` | a CEL boolean over `output` and the current variables. Structured JSON output binds `output` as the parsed object (`output.total == 2`); text output binds it as the string |
 | `message: "str"` | the failure message printed when `rule` is false |
+| `max_duration: "500ms"` | fail if the tool call took longer; times the successful attempt, excluding retry backoff |
 
 `isError` is a protocol-level field on every `tools/call` response. A result with `isError: true` is a valid JSON-RPC response: the tool ran but reported failure. Ocarina treats it as a step failure by default, unless the step sets `ignore_errors: true` or asserts `expect: is_error: true`.
 
@@ -123,7 +125,8 @@ This is a guardrail, not a security boundary. MCP annotations are advisory, and 
 The engine records every leaf step's outcome (name, server, tool, status, message, duration) into a result object. `play` reports it two ways, plus an open telemetry path:
 
 - **text** (default): a per-step trace and a final `N passed, M failed, K skipped` tally.
-- **`--output json`**: the full structured result, per-step plus run totals. This is the open surface: transform it into JUnit, a dashboard, or anything else.
+- **`--output junit`**: JUnit XML, the format CI test dashboards ingest (GitLab reports, Jenkins, the common GitHub Actions reporters). One rondo is a `<testsuite>`; each step is a `<testcase>`.
+- **`--output json`**: the full structured result, per-step plus run totals.
 - **OTLP traces**: when `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) is set, `play` exports the run as OpenTelemetry traces, a root span for the run and a child span per step, using the OTLP/JSON-over-HTTP encoding. This uses the standard library only and adds no dependencies. `OTEL_EXPORTER_OTLP_HEADERS` carries auth to a hosted collector.
 
 The run's exit code derives from the failures list, kept separate from the per-step records. A step rescued by a `block:` shows `status: failed` in the report while the run still reports `ok: true` and exits 0.
@@ -136,7 +139,10 @@ The run's exit code derives from the failures list, kept separate from the per-s
 ocarina docs   <server...>                       # markdown docs from a live server
 ocarina record <out.yaml> <server...>            # proxy a session into a rondo
 ocarina play   <file.yaml>                        # execute a rondo
-ocarina play   <file.yaml> --output json          # structured per-step report
+ocarina play   <file.yaml> --output junit         # JUnit XML for CI dashboards
+ocarina play   <file.yaml> --snapshot             # assert output against recorded result: blocks
+ocarina play   <file.yaml> --update               # re-baseline result: blocks
+ocarina play   <file.yaml> --data rows.csv        # run once per data row (columns become keys)
 ocarina play   <file.yaml> --safe                 # refuse non-read-only tools
 ocarina play   <file.yaml> --trace                # log every JSON-RPC frame to stderr
 ocarina play   <file.yaml> --tags smoke -e repo=acme
@@ -156,7 +162,7 @@ ocarina hum    <server...> -- <tool> [key=value] # ad-hoc single tool call
 
 ### Parser (`internal/rondo/`)
 
-Deserializes YAML into a `File`. Normalizes the input: a single `server:` block becomes a one-entry `Servers` map, `tasks:` is merged into the step list as an alias for `rondo:`, and `register:` is folded into `echo:`. Does not connect to any server.
+Deserializes YAML into a `File`. Normalizes the input: a single `server:` block becomes a one-entry `Servers` map, `tasks:` and `steps:` are merged into the step list as aliases for `rondo:`, and `register:` is folded into `echo:`. Does not connect to any server.
 
 ```go
 type File struct {
@@ -181,6 +187,7 @@ type Step struct {
     Resource         string         `yaml:"resource"`
     ListResources    string         `yaml:"list_resources"`
     Sleep            string         `yaml:"sleep"`
+    Set              map[string]string `yaml:"set"`     // var -> CEL expression (set_fact)
     Args             map[string]any `yaml:"args"`
     Grab             string         `yaml:"grab"`       // a gjson path
     Echo             string         `yaml:"echo"`       // register: is an alias
@@ -223,7 +230,7 @@ Static analysis that connects to fetch schemas but calls no tools:
 
 - every `tool:` exists on its server, with required `args:` present and types matching `inputSchema`
 - every `{{key}}` resolves from `keys:`, `params:`, `{{env.X}}`, or a prior `echo:`
-- `when:`, `retry.until:`, and `expect.rule:` parse as CEL; `timeout:` parses as a duration
+- `when:`, `retry.until:`, `expect.rule:`, and each `set:` expression parse as CEL; `timeout:`, `sleep:`, and `expect.max_duration:` parse as durations
 - every `server:` reference exists in the `servers:` map
 - `block:`/`rescue:`/`always:` groups are flattened so their sub-steps are checked
 

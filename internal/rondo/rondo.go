@@ -13,6 +13,7 @@ type File struct {
 	Server  Server            `yaml:"server,omitempty"`
 	Steps   []Step            `yaml:"rondo,omitempty"`
 	Tasks   []Step            `yaml:"tasks,omitempty"` // Ansible-style alias; merged into Steps in Load
+	Steps2  []Step            `yaml:"steps,omitempty"` // common alias for rondo:; merged into Steps in Load
 	LLM     []LLMRound        `yaml:"llm,omitempty"`
 
 	// These describe a rondo when it is served as a composite MCP tool via
@@ -105,6 +106,7 @@ type Step struct {
 	Retry            *RetryConfig      `yaml:"retry,omitempty"`
 	Echo             string            `yaml:"echo,omitempty"`
 	Register         string            `yaml:"register,omitempty"` // Ansible-style alias for echo; merged in Load
+	Set              map[string]string `yaml:"set,omitempty"`      // var -> CEL expression; computed without calling a tool (Ansible set_fact)
 	Grab             string            `yaml:"grab,omitempty"`
 	Loop             string            `yaml:"loop,omitempty"`
 	Tags             []string          `yaml:"tags,omitempty"`
@@ -133,12 +135,13 @@ type RetryConfig struct {
 
 // Expect declares assertions checked after a step runs. play exits non-zero if any fail.
 type Expect struct {
-	Contains string `yaml:"contains,omitempty"`
-	Matches  string `yaml:"matches,omitempty"`
-	Equals   string `yaml:"equals,omitempty"`
-	IsError  *bool  `yaml:"is_error,omitempty"`
-	Rule     string `yaml:"rule,omitempty"`    // CEL boolean expression; `output` and all vars are in scope
-	Message  string `yaml:"message,omitempty"` // custom failure message for Rule
+	Contains    string `yaml:"contains,omitempty"`
+	Matches     string `yaml:"matches,omitempty"`
+	Equals      string `yaml:"equals,omitempty"`
+	IsError     *bool  `yaml:"is_error,omitempty"`
+	Rule        string `yaml:"rule,omitempty"`         // CEL boolean expression; `output` and all vars are in scope
+	Message     string `yaml:"message,omitempty"`      // custom failure message for Rule
+	MaxDuration string `yaml:"max_duration,omitempty"` // fail if the tool call took longer than this (e.g. 500ms)
 }
 
 // LLMRound captures a sampling/createMessage exchange recorded during a session.
@@ -167,10 +170,13 @@ func Load(path string) (*File, error) {
 		return nil, fmt.Errorf("%s", yaml.FormatError(err, true, true))
 	}
 
-	if len(f.Tasks) > 0 && len(f.Steps) == 0 {
+	if len(f.Steps) == 0 && len(f.Tasks) > 0 {
 		f.Steps = f.Tasks
-		f.Tasks = nil
 	}
+	if len(f.Steps) == 0 && len(f.Steps2) > 0 {
+		f.Steps = f.Steps2
+	}
+	f.Tasks, f.Steps2 = nil, nil
 	for i := range f.Steps {
 		if f.Steps[i].Echo == "" && f.Steps[i].Register != "" {
 			f.Steps[i].Echo = f.Steps[i].Register

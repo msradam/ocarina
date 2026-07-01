@@ -516,13 +516,14 @@ rondo:
           <tr><td><code class="lk-code-inline">resource</code></td><td>Resource URI to read (<code class="lk-code-inline">resources/read</code>).</td></tr>
           <tr><td><code class="lk-code-inline">list_resources</code></td><td>List a server's resources. Output is a JSON array of URIs.</td></tr>
           <tr><td><code class="lk-code-inline">sleep</code></td><td>Pause for a duration (<code class="lk-code-inline">500ms</code>, <code class="lk-code-inline">2s</code>) to pace a run.</td></tr>
+          <tr><td><code class="lk-code-inline">set</code></td><td>Compute vars from CEL expressions without a call, e.g. <code class="lk-code-inline">{tz: "'Asia/' + city"}</code> (Ansible <code class="lk-code-inline">set_fact</code>).</td></tr>
           <tr><td><code class="lk-code-inline">server</code></td><td>Which entry in <code class="lk-code-inline">servers</code> to run this step against. Defaults to the first.</td></tr>
           <tr><td><code class="lk-code-inline">args</code></td><td>Tool arguments. <code class="lk-code-inline">{{key}}</code> interpolates from <code class="lk-code-inline">keys</code>, a prior <code class="lk-code-inline">echo:</code>, or <code class="lk-code-inline">{{env.NAME}}</code>.</td></tr>
           <tr><td><code class="lk-code-inline">when</code></td><td>CEL condition; the step runs only if it is true. Bare variable names, not <code class="lk-code-inline">{{...}}</code>.</td></tr>
           <tr><td><code class="lk-code-inline">loop</code></td><td>Iterate over a JSON array, setting <code class="lk-code-inline">{{item}}</code> each pass.</td></tr>
           <tr><td><code class="lk-code-inline">grab</code></td><td>gjson path into the JSON result (<code class="lk-code-inline">.0.sha</code>, <code class="lk-code-inline">.name</code>), applied before <code class="lk-code-inline">echo</code>.</td></tr>
           <tr><td><code class="lk-code-inline">echo</code></td><td>Capture the (grabbed) value into a key for later steps. <code class="lk-code-inline">register:</code> is an alias.</td></tr>
-          <tr><td><code class="lk-code-inline">expect</code></td><td>Assertions: <code class="lk-code-inline">contains</code>, <code class="lk-code-inline">matches</code> (regex), <code class="lk-code-inline">equals</code>, <code class="lk-code-inline">is_error</code>, <code class="lk-code-inline">rule</code> (CEL), <code class="lk-code-inline">message</code>. <code class="lk-code-inline">play</code> exits non-zero on failure.</td></tr>
+          <tr><td><code class="lk-code-inline">expect</code></td><td>Assertions: <code class="lk-code-inline">contains</code>, <code class="lk-code-inline">matches</code> (regex), <code class="lk-code-inline">equals</code>, <code class="lk-code-inline">is_error</code>, <code class="lk-code-inline">rule</code> (CEL), <code class="lk-code-inline">message</code>, <code class="lk-code-inline">max_duration</code> (per-step latency gate). <code class="lk-code-inline">play</code> exits non-zero on failure.</td></tr>
           <tr><td><code class="lk-code-inline">timeout</code></td><td>Per-step deadline (<code class="lk-code-inline">10s</code>). The step fails if it is exceeded.</td></tr>
           <tr><td><code class="lk-code-inline">retry</code></td><td><code class="lk-code-inline">retries</code>, <code class="lk-code-inline">delay</code>, and <code class="lk-code-inline">until:</code> (CEL). Re-run until the condition holds.</td></tr>
           <tr><td><code class="lk-code-inline">tags</code></td><td>Label the step for <code class="lk-code-inline">--tags</code> / <code class="lk-code-inline">--skip-tags</code> filtering.</td></tr>
@@ -711,7 +712,10 @@ ocarina play examples/time-zones.yaml -e owner=acme --tags smoke</code></pre>
         <p style="color:var(--text-body);margin:var(--space-3) 0 var(--space-2);font-size:var(--type-sm)"><strong>Flags</strong></p>
         <table class="field-table" style="max-width:560px">
           <tbody>
-            <tr><td><code class="lk-code-inline">--output json</code></td><td>Emit a machine-readable pass/fail report on a clean stdout, for CI.</td></tr>
+            <tr><td><code class="lk-code-inline">--output json|junit</code></td><td>Machine-readable report on a clean stdout. <code class="lk-code-inline">junit</code> is JUnit XML for CI test dashboards.</td></tr>
+            <tr><td><code class="lk-code-inline">--snapshot</code></td><td>Assert each step's output against its recorded <code class="lk-code-inline">result:</code> block; fail on drift.</td></tr>
+            <tr><td><code class="lk-code-inline">--update</code></td><td>Rewrite <code class="lk-code-inline">result:</code> blocks from the live output (re-baseline).</td></tr>
+            <tr><td><code class="lk-code-inline">--data rows.csv</code></td><td>Run the rondo once per CSV/JSON row; columns become <code class="lk-code-inline">{{keys}}</code>.</td></tr>
             <tr><td><code class="lk-code-inline">--trace</code></td><td>Log every JSON-RPC frame to stderr.</td></tr>
             <tr><td><code class="lk-code-inline">--dry-run</code></td><td>Print steps without executing them.</td></tr>
             <tr><td><code class="lk-code-inline">-e key=value</code></td><td>Override a <code class="lk-code-inline">keys</code> variable at run time. Repeatable.</td></tr>

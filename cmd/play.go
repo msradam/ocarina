@@ -27,6 +27,7 @@ var (
 	green      = color.New(color.FgGreen).SprintfFunc()
 	red        = color.New(color.FgRed).SprintfFunc()
 	yellowPlay = color.New(color.FgYellow).SprintfFunc()
+	gray       = color.New(color.Faint).SprintfFunc()
 )
 
 // stdout receives the human progress output. --output json points it at
@@ -52,18 +53,21 @@ Example:
 		if err != nil {
 			return fmt.Errorf("load rondo: %w", err)
 		}
-
-		notes := make(map[string]string, len(c.Keys))
-		for k, v := range c.Keys {
-			notes[k] = v
+		if len(c.Steps) == 0 {
+			return fmt.Errorf("rondo has no steps (put them under rondo:, tasks:, or steps:)")
 		}
-		// -e key=value overrides rondo keys
+
+		base := make(map[string]string, len(c.Keys))
+		for k, v := range c.Keys {
+			base[k] = v
+		}
+		extras := map[string]string{}
 		for _, kv := range mustStringArray(cmd, "extra-vars") {
 			k, v, ok := strings.Cut(kv, "=")
 			if !ok {
 				return fmt.Errorf("-e %q: expected key=value", kv)
 			}
-			notes[k] = v
+			extras[k] = v
 		}
 
 		onlyTags := tagSet(mustStringArray(cmd, "tags"))
@@ -74,32 +78,83 @@ Example:
 			return fmt.Errorf("rondo is missing a server: block")
 		}
 
-		outputJSON := false
-		if o, _ := cmd.Flags().GetString("output"); o == "json" {
-			outputJSON = true
-			stdout = io.Discard
+		outMode, _ := cmd.Flags().GetString("output")
+		switch outMode {
+		case "text", "json", "junit":
+		default:
+			return fmt.Errorf("--output must be text, json, or junit")
+		}
+		if outMode != "text" {
+			stdout = io.Discard // machine formats own real stdout alone
 		}
 		if t, _ := cmd.Flags().GetBool("trace"); t {
 			mcpclient.TraceWriter = os.Stderr
 		}
 
-		eng := newEngine(ctx, c, notes)
+		dataPath, _ := cmd.Flags().GetString("data")
+		if u, _ := cmd.Flags().GetBool("update"); u && dataPath != "" {
+			return fmt.Errorf("--update cannot be combined with --data: each row would overwrite the same result: block")
+		}
+
+		var rows []map[string]string
+		if dataPath != "" {
+			r, derr := loadDataRows(dataPath)
+			if derr != nil {
+				return derr
+			}
+			rows = r
+		} else {
+			rows = []map[string]string{nil} // a single run with no row overlay
+		}
+
+		eng := newEngine(ctx, c, mergeNotes(base, nil, extras))
 		defer eng.close()
 		eng.dryRun, _ = cmd.Flags().GetBool("dry-run")
 		eng.safe, _ = cmd.Flags().GetBool("safe")
+		eng.snapshot, _ = cmd.Flags().GetBool("snapshot")
+		eng.update, _ = cmd.Flags().GetBool("update")
+		eng.snapshot = eng.snapshot || eng.update // --update implies snapshot mode
 		eng.onlyTags = onlyTags
 		eng.skipTags = skipTags
 
 		start := time.Now()
-		failures := eng.runSteps(c.Steps, notes, filepath.Dir(args[0]), 0)
+		var failures []string
+		for ri, row := range rows {
+			if len(rows) > 1 {
+				eng.label = dataLabel(ri, len(rows), row)
+				fmt.Fprintf(stdout, "%s data %s\n\n", boldCyan("###"), eng.label)
+			}
+			failures = append(failures, eng.runSteps(c.Steps, mergeNotes(base, row, extras), filepath.Dir(args[0]), 0)...)
+		}
 		result := summarize(eng.results, failures, time.Since(start))
 		exportOTLP(filepath.Base(args[0]), result, start)
 
-		if outputJSON {
+		if eng.update {
+			// Load populates Servers from a single server: block; drop the derived
+			// map before saving so --update rewrites the shape the user authored
+			// instead of emitting both server: and servers:.
+			if c.Server.Command != "" || c.Server.URL != "" || c.Server.Name != "" {
+				c.Servers = nil
+				c.ServerOrder = nil
+			}
+			if err := rondo.Save(args[0], c); err != nil {
+				return fmt.Errorf("save updated snapshots: %w", err)
+			}
+			fmt.Fprintf(os.Stderr, "ocarina: updated snapshots in %s\n", args[0])
+		}
+
+		switch outMode {
+		case "json":
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
 			_ = enc.Encode(result)
-		} else {
+		case "junit":
+			xmlBytes, xerr := junitXML(filepath.Base(args[0]), result)
+			if xerr != nil {
+				return xerr
+			}
+			_, _ = os.Stdout.Write(xmlBytes)
+		default:
 			tally := fmt.Sprintf("%d passed, %d failed, %d skipped in %s",
 				result.Passed, result.Failed, result.Skipped, time.Since(start).Round(time.Millisecond))
 			if result.Ok {
@@ -117,10 +172,15 @@ Example:
 
 // runWithRetry wraps dispatchStep with Ansible-faithful retry/until semantics.
 // When retry: is nil, it delegates directly with no overhead.
-func runWithRetry(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, notes map[string]string) (string, bool, error) {
+// The returned duration is the wall time of the final dispatch attempt (the one
+// whose output is returned), excluding retry backoff, so expect.max_duration
+// asserts a single call's latency rather than the retry loop's total.
+func runWithRetry(ctx context.Context, sess *mcp.ClientSession, step rondo.Step, notes map[string]string) (string, bool, time.Duration, error) {
 	r := step.Retry
 	if r == nil {
-		return dispatchStep(ctx, sess, step, notes)
+		t0 := time.Now()
+		out, isErr, err := dispatchStep(ctx, sess, step, notes)
+		return out, isErr, time.Since(t0), err
 	}
 
 	totalAttempts := 1
@@ -132,35 +192,40 @@ func runWithRetry(ctx context.Context, sess *mcp.ClientSession, step rondo.Step,
 
 	delay := 5 * time.Second
 	if r.Delay != "" {
-		if d, err := time.ParseDuration(r.Delay); err == nil && d > 0 {
-			delay = d
+		d, derr := time.ParseDuration(r.Delay)
+		if derr != nil || d < 0 {
+			return "", false, 0, fmt.Errorf("invalid retry delay %q", r.Delay)
 		}
+		delay = d
 	}
 
 	var lastOutput string
 	var lastIsErr bool
 	var lastErr error
+	var lastDur time.Duration
 
 	for attempt := 1; attempt <= totalAttempts; attempt++ {
+		t0 := time.Now()
 		lastOutput, lastIsErr, lastErr = dispatchStep(ctx, sess, step, notes)
+		lastDur = time.Since(t0)
 
 		if r.Until != "" {
 			passed, evalErr := condition.EvalBool(r.Until, notes, lastOutput)
 			if evalErr != nil {
-				return lastOutput, lastIsErr, fmt.Errorf("retry until: %w", evalErr)
+				return lastOutput, lastIsErr, lastDur, fmt.Errorf("retry until: %w", evalErr)
 			}
 			if passed {
-				return lastOutput, lastIsErr, lastErr
+				return lastOutput, lastIsErr, lastDur, lastErr
 			}
 		} else if lastErr == nil && !lastIsErr {
-			return lastOutput, lastIsErr, lastErr
+			return lastOutput, lastIsErr, lastDur, lastErr
 		}
 
 		if attempt < totalAttempts {
 			fmt.Fprintf(os.Stderr, "    retrying (%d/%d in %s)...\n", attempt+1, totalAttempts, delay)
 			select {
 			case <-ctx.Done():
-				return lastOutput, lastIsErr, ctx.Err()
+				return lastOutput, lastIsErr, lastDur, ctx.Err()
 			case <-time.After(delay):
 			}
 		}
@@ -173,7 +238,7 @@ func runWithRetry(ctx context.Context, sess *mcp.ClientSession, step rondo.Step,
 			lastErr = fmt.Errorf("retries exhausted after %d attempt(s)", totalAttempts)
 		}
 	}
-	return lastOutput, lastIsErr, lastErr
+	return lastOutput, lastIsErr, lastDur, lastErr
 }
 
 // isToolError is true when the server returned isError:true on a tool call.
@@ -331,9 +396,25 @@ func resolveLoop(loop string, notes map[string]string) ([]string, error) {
 	return items, nil
 }
 
-func checkExpect(e *rondo.Expect, output string, isToolError bool, notes map[string]string) string {
+func checkExpect(e *rondo.Expect, output string, isToolError bool, dur time.Duration, notes map[string]string) string {
+	if e.MaxDuration != "" {
+		limit, err := time.ParseDuration(e.MaxDuration)
+		if err != nil {
+			return fmt.Sprintf("invalid max_duration %q: %v", e.MaxDuration, err)
+		}
+		if limit <= 0 {
+			return fmt.Sprintf("invalid max_duration %q: must be positive", e.MaxDuration)
+		}
+		if dur > limit {
+			return fmt.Sprintf("took %s, over max_duration %s", dur.Round(time.Millisecond), limit)
+		}
+		fmt.Fprintf(stdout, "    %s under %s (%s)\n", green("PASS:"), limit, dur.Round(time.Millisecond))
+	}
 	if e.Contains != "" {
 		want := interp.Apply(e.Contains, notes).(string)
+		if leftover := interp.Unresolved(want); len(leftover) > 0 {
+			return fmt.Sprintf("expect.contains references undefined %s (not in keys, data row, or a prior echo)", strings.Join(leftover, ", "))
+		}
 		if !strings.Contains(output, want) {
 			return fmt.Sprintf("expected output to contain %q", want)
 		}
@@ -341,6 +422,9 @@ func checkExpect(e *rondo.Expect, output string, isToolError bool, notes map[str
 	}
 	if e.Equals != "" {
 		want := interp.Apply(e.Equals, notes).(string)
+		if leftover := interp.Unresolved(want); len(leftover) > 0 {
+			return fmt.Sprintf("expect.equals references undefined %s (not in keys, data row, or a prior echo)", strings.Join(leftover, ", "))
+		}
 		if strings.TrimSpace(output) != strings.TrimSpace(want) {
 			return fmt.Sprintf("expected output to equal %q", want)
 		}
@@ -348,6 +432,9 @@ func checkExpect(e *rondo.Expect, output string, isToolError bool, notes map[str
 	}
 	if e.Matches != "" {
 		pattern := interp.Apply(e.Matches, notes).(string)
+		if leftover := interp.Unresolved(pattern); len(leftover) > 0 {
+			return fmt.Sprintf("expect.matches references undefined %s (not in keys, data row, or a prior echo)", strings.Join(leftover, ", "))
+		}
 		re, err := regexp.Compile(pattern)
 		if err != nil {
 			return fmt.Sprintf("invalid regex %q: %v", pattern, err)
@@ -442,6 +529,8 @@ func stepLabel(t rondo.Step) string {
 		return "list_resources"
 	case t.Sleep != "":
 		return "sleep:" + t.Sleep
+	case len(t.Set) > 0:
+		return "set"
 	default:
 		return "?"
 	}
@@ -459,6 +548,8 @@ func dryRunDetail(t rondo.Step, notes map[string]string) string {
 		return "list_resources"
 	case t.Sleep != "":
 		return "sleep=" + t.Sleep
+	case len(t.Set) > 0:
+		return fmt.Sprintf("set=%v", t.Set)
 	default:
 		return "?"
 	}
@@ -504,6 +595,46 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
+}
+
+// snapshotText reconstructs the recorded output from a result: block, joining
+// text items the way callTool joins live text content.
+func snapshotText(items []rondo.ResultItem) string {
+	parts := make([]string, len(items))
+	for i, it := range items {
+		parts[i] = it.Text
+	}
+	return strings.Join(parts, "\n")
+}
+
+// snapshotDiff reports the first line where the recorded and live output differ,
+// so a mismatch points at the change instead of dumping both blobs.
+func snapshotDiff(want, got string) string {
+	wl, gl := strings.Split(want, "\n"), strings.Split(got, "\n")
+	for i := 0; i < len(wl) || i < len(gl); i++ {
+		var w, g string
+		if i < len(wl) {
+			w = wl[i]
+		}
+		if i < len(gl) {
+			g = gl[i]
+		}
+		if w != g {
+			return fmt.Sprintf("snapshot mismatch at line %d:\n      - %s\n      + %s", i+1, truncate(w, 120), truncate(g, 120))
+		}
+	}
+	return "snapshot mismatch"
+}
+
+// sortedKeys returns a map's keys in sorted order, so set: assignments evaluate
+// deterministically regardless of Go's map iteration order.
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 var (
@@ -585,7 +716,10 @@ func renderColor(v any, indent string) string {
 func init() {
 	playCmd.Flags().Bool("dry-run", false, "print steps without executing them")
 	playCmd.Flags().Bool("safe", false, "refuse any tool not marked read-only (override per step with allow_destructive: true)")
-	playCmd.Flags().String("output", "text", "output format: text or json")
+	playCmd.Flags().String("output", "text", "output format: text, json, or junit")
+	playCmd.Flags().Bool("snapshot", false, "assert each step's output against its recorded result: block")
+	playCmd.Flags().Bool("update", false, "rewrite result: blocks from the live output (implies --snapshot)")
+	playCmd.Flags().String("data", "", "run the rondo once per row of a CSV or JSON data file; columns become keys")
 	playCmd.Flags().Bool("trace", false, "log every JSON-RPC frame to stderr")
 	playCmd.Flags().StringArrayP("extra-vars", "e", nil, "override keys: variables (key=value, repeatable)")
 	playCmd.Flags().StringArray("tags", nil, "run only steps with these tags (repeatable)")

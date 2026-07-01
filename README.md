@@ -58,7 +58,7 @@ ocarina validate clock.yaml      # check tools, args, and data flow, no calls
 |---|---|
 | `play <rondo.yaml>` | Execute each step against the live server |
 | `serve <rondo.yaml>...` | Expose rondos as composite MCP tools (stdio or HTTP) |
-| `validate <rondo.yaml>` | Check tool names, required args, types, and `{{key}}` flow without calling anything |
+| `validate <rondo.yaml>` | Check tool names, required args, types, and `{{key}}` flow without calling anything; `--strict` fails on out-of-schema args for CI |
 | `diff <rondo.yaml>` | Compare the rondo's tools against the server's current schemas |
 | `lock <rondo.yaml>` | Snapshot the full tool schema; `--check` fails on drift |
 | `load <rondo.yaml>` | Run the rondo as a concurrent load test with latency percentiles |
@@ -106,12 +106,15 @@ rondo:
 | `resource` | Resource URI to read (`resources/read`) |
 | `list_resources` | List a server's resources; output is a JSON URI array |
 | `sleep` | Pause (e.g. `2s`); paces a run, makes no call |
+| `set` | Compute vars from CEL expressions without a call: `{tz: "'Asia/' + city"}` (Ansible `set_fact`). Values are strings; arithmetic carried across steps is not yet supported |
 | `args` | Tool arguments. `{{key}}` interpolates from `keys`, prior `echo`, or `{{env.NAME}}` |
-| `grab` | gjson path into the output before capture: `.0.sha`, `.items.0.id` |
+| `grab` | gjson path into the output before capture: `.0.sha`, `.items.0.id`. On a step that also has `expect:`, the assertion sees the grabbed value, not the full output |
 | `echo` | Store the output (or grabbed value) under a key |
 | `expect.contains` / `matches` / `equals` | Assert on the output (substring, regex, exact) |
 | `expect.is_error` | Assert whether the tool returned `isError: true` |
-| `expect.rule` / `message` | Assert a CEL expression over `output` and vars, with a custom failure message |
+| `expect.rule` / `message` | Assert a CEL expression over `output` and vars, with a custom failure message. When the tool returns structured JSON, `output` is the parsed object, so `output.total == 2` and `output.items.all(x, x.ok)` work; for text output `output` is the string (`output.contains(...)`) |
+| `expect.max_duration` | Fail if the tool call took longer than this (e.g. `500ms`); a per-step latency gate |
+| `result` | Recorded output baseline; `play --snapshot` asserts against it, `--update` rewrites it |
 | `when` | Run the step only if a CEL expression is true (bare variable names, not `{{...}}`) |
 | `loop` | Expand a JSON array into repeated iterations, setting `{{item}}` |
 | `retry` | `retries`, `delay`, and `until` (a CEL expression); retry until it holds |
@@ -121,7 +124,7 @@ rondo:
 | `allow_destructive` | Run this step even under `--safe` |
 | `server` | Which server (a key in `servers:`); defaults to the first |
 
-When a tool returns `structuredContent`, `grab` and `expect` run against that typed JSON instead of the text block. Coming from Ansible? `tasks:` is accepted for `rondo:`, and `register:` for `echo:`.
+When a tool returns `structuredContent`, `grab` and `expect` run against that typed JSON instead of the text block. Coming from Ansible? `tasks:` (or `steps:`) is accepted for `rondo:`, and `register:` for `echo:`. A rondo that resolves to zero steps is an error, not a silent pass, so a mistyped top-level key fails loudly.
 
 Full reference: [docs/architecture.md](docs/architecture.md).
 
@@ -218,12 +221,33 @@ This is a guardrail, not a security boundary: MCP annotations are advisory, and 
 
 ## Output
 
-`play` prints a per-step run and a final tally. Two open output surfaces let other tools consume a run without Ocarina shipping format-specific reporters:
+`play` prints a per-step run and a final tally. Machine-readable surfaces let other tools consume a run:
 
-- `--output json` emits a structured result: per-step status, message, and duration, plus the run total. Transform it into JUnit, a dashboard, or anything else.
+- `--output junit` emits JUnit XML, the format CI test dashboards ingest (GitLab test reports, the Jenkins JUnit plugin, the common GitHub Actions reporters). One rondo is a test suite; each step is a test case.
+- `--output json` emits a structured result: per-step status, message, and duration, plus the run total.
 - Set `OTEL_EXPORTER_OTLP_ENDPOINT` and `play` exports the run as OpenTelemetry traces (a span per step) over OTLP. Any OTLP backend (Jaeger, Tempo, Honeycomb, Datadog) ingests it. This uses the standard library only, so it adds no dependencies.
 
 `--trace` logs every JSON-RPC frame to stderr for debugging.
+
+## Snapshot testing
+
+`record` writes each tool's output into a `result:` block. `play --snapshot` asserts the live output against that recorded block and fails on any drift, so a recorded session becomes a regression test with no hand-written assertions. `play --update` re-baselines the blocks after an intended change (the jest `-u` workflow). In CI, run `--snapshot` without `--update` so drift fails the build instead of being silently rewritten.
+
+```bash
+ocarina record session.yaml uvx mcp-server-fetch   # captures result: blocks
+ocarina play session.yaml --snapshot                # fails if output drifts
+ocarina play session.yaml --update                  # re-baseline on purpose
+```
+
+Snapshots suit deterministic output. For a tool whose output changes every call (a timestamp, a fresh id), assert the stable part with `expect:` instead. `--update` re-serializes the rondo, so comments and inline formatting are not preserved; keep a recorded rondo separate from a hand-annotated one.
+
+## Data-driven runs
+
+`play --data rows.csv` runs the whole rondo once per row, with each column injected as a `{{key}}` for that iteration. A JSON array of objects works the same way. Precedence is `keys:` then the data row then `-e` overrides.
+
+```bash
+ocarina play zone-check.yaml --data timezones.csv
+```
 
 ## Multiple servers
 

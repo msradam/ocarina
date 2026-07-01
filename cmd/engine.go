@@ -23,7 +23,10 @@ type engine struct {
 	file     *rondo.File
 	keys     map[string]string // used to interpolate server env/headers on connect
 	dryRun   bool
-	safe     bool // refuse any tool not marked readOnlyHint, unless allow_destructive
+	safe     bool   // refuse any tool not marked readOnlyHint, unless allow_destructive
+	snapshot bool   // assert each step's output against its recorded result: block
+	update   bool   // rewrite result: blocks from the live output instead of asserting
+	label    string // per-run tag (e.g. "row 2/4"), appended to recorded step names
 	onlyTags map[string]struct{}
 	skipTags map[string]struct{}
 
@@ -33,8 +36,12 @@ type engine struct {
 	results []stepResult // per-leaf-step outcomes, for the structured report
 }
 
-// rec records one leaf step's outcome.
+// rec records one leaf step's outcome, timed from the step's start (used for
+// steps that fail or are skipped before any tool call).
 func (e *engine) rec(name, server string, step rondo.Step, status, msg string, start time.Time) {
+	if e.label != "" {
+		name += " (" + e.label + ")"
+	}
 	end := time.Now()
 	e.results = append(e.results, stepResult{
 		Name:       name,
@@ -45,6 +52,26 @@ func (e *engine) rec(name, server string, step rondo.Step, status, msg string, s
 		Message:    msg,
 		DurationMS: end.Sub(start).Milliseconds(),
 		startedAt:  start,
+		endedAt:    end,
+	})
+}
+
+// recDur records a step whose duration is the measured tool-call latency,
+// excluding the when:/connect/schema-check overhead that surrounds it.
+func (e *engine) recDur(name, server string, step rondo.Step, status, msg string, dur time.Duration) {
+	if e.label != "" {
+		name += " (" + e.label + ")"
+	}
+	end := time.Now()
+	e.results = append(e.results, stepResult{
+		Name:       name,
+		Server:     server,
+		Tool:       step.Tool,
+		Resource:   step.Resource,
+		Status:     status,
+		Message:    msg,
+		DurationMS: dur.Milliseconds(),
+		startedAt:  end.Add(-dur),
 		endedAt:    end,
 	})
 }
@@ -197,11 +224,16 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 				iterNotes["item"] = item
 			}
 
-			// sleep-only steps run silently; they exist to pace a demo or add delay
-			if step.Sleep != "" && step.Tool == "" && step.Resource == "" && step.ListResources == "" {
-				if d, err := time.ParseDuration(step.Sleep); err == nil {
-					time.Sleep(d)
+			// sleep-only steps pace a demo or add delay between calls
+			if step.Sleep != "" && step.Tool == "" && step.Resource == "" && step.ListResources == "" && len(step.Set) == 0 {
+				d, perr := time.ParseDuration(step.Sleep)
+				if perr != nil || d < 0 {
+					fmt.Fprintf(os.Stderr, "%s %s\n    %s invalid sleep %q\n\n", boldCyan("==>"), name, red("error:"), step.Sleep)
+					fails = append(fails, fmt.Sprintf("step %q: invalid sleep %q", name, step.Sleep))
+					continue
 				}
+				fmt.Fprintf(stdout, "%s %s\n    %s %s\n\n", boldCyan("==>"), name, gray("sleeping"), d)
+				time.Sleep(d)
 				continue
 			}
 
@@ -234,6 +266,32 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 			if e.dryRun {
 				fmt.Fprintf(stdout, "    [dry-run] %s\n\n", dryRunDetail(step, iterNotes))
 				e.rec(name, dispServer, step, "skipped", "dry-run", start)
+				continue
+			}
+
+			// set: computes vars via CEL without calling a tool. Each expression
+			// is evaluated against the scope as it stands, then written to notes
+			// so later steps can reference it.
+			if len(step.Set) > 0 {
+				setErr := ""
+				for _, k := range sortedKeys(step.Set) {
+					v, evalErr := condition.EvalString(step.Set[k], iterNotes, "")
+					if evalErr != nil {
+						setErr = fmt.Sprintf("set %s: %v", k, evalErr)
+						break
+					}
+					notes[k] = v
+					iterNotes[k] = v
+					fmt.Fprintf(stdout, "    %s %s = %s\n", green("set:"), k, v)
+				}
+				if setErr != "" {
+					fmt.Fprintf(os.Stderr, "    %s %s\n\n", red("error:"), setErr)
+					fails = append(fails, fmt.Sprintf("step %q: %s", name, setErr))
+					e.rec(name, dispServer, step, "failed", setErr, start)
+					continue
+				}
+				e.rec(name, dispServer, step, "ok", "", start)
+				fmt.Fprintln(stdout)
 				continue
 			}
 
@@ -295,13 +353,13 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 				}
 			}
 
-			output, isToolError, dispatchErr := runWithRetry(stepCtx, sess, step, iterNotes)
+			output, isToolError, callDur, dispatchErr := runWithRetry(stepCtx, sess, step, iterNotes)
 			if cancelFn != nil {
 				cancelFn()
 			}
 			if dispatchErr != nil {
 				msg := fmt.Sprintf("    %s %v\n\n", red("error:"), dispatchErr)
-				e.rec(name, dispServer, step, "failed", dispatchErr.Error(), start)
+				e.recDur(name, dispServer, step, "failed", dispatchErr.Error(), callDur)
 				if step.IgnoreErrors {
 					fmt.Fprint(stdout, msg)
 					continue
@@ -318,7 +376,7 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 				if !expectsError {
 					fmt.Fprintf(os.Stderr, "    %s %s\n\n", red("error:"), truncate(output, 200))
 					fails = append(fails, fmt.Sprintf("step %q: tool returned an error", name))
-					e.rec(name, dispServer, step, "failed", "tool returned an error", start)
+					e.recDur(name, dispServer, step, "failed", "tool returned an error", callDur)
 					continue
 				}
 			}
@@ -330,7 +388,7 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 					if !step.IgnoreErrors {
 						fmt.Fprintf(os.Stderr, "    %s %v\n\n", red("error:"), grabErr)
 						fails = append(fails, fmt.Sprintf("step %q: %v", name, grabErr))
-						e.rec(name, dispServer, step, "failed", grabErr.Error(), start)
+						e.recDur(name, dispServer, step, "failed", grabErr.Error(), callDur)
 						continue
 					}
 					fmt.Fprintf(os.Stderr, "    %s %v\n", yellowPlay("grab:"), grabErr)
@@ -344,6 +402,7 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 				displayed = captured
 			}
 			fmt.Fprintf(stdout, "%s\n", colorOutput(displayed))
+			fmt.Fprintf(stdout, "    %s\n", gray("took %s", callDur.Round(time.Millisecond)))
 
 			if step.Echo != "" {
 				notes[step.Echo] = captured
@@ -351,7 +410,7 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 
 			status, statusMsg := "ok", ""
 			if step.Expect != nil {
-				if fail := checkExpect(step.Expect, captured, isToolError, iterNotes); fail != "" {
+				if fail := checkExpect(step.Expect, captured, isToolError, callDur, iterNotes); fail != "" {
 					fmt.Fprintf(os.Stderr, "    %s %s\n", red("FAIL:"), fail)
 					status, statusMsg = "failed", fail
 					if !step.IgnoreErrors {
@@ -359,7 +418,40 @@ func (e *engine) runSteps(steps []rondo.Step, notes map[string]string, dir strin
 					}
 				}
 			}
-			e.rec(name, dispServer, step, status, statusMsg, start)
+
+			// snapshot: compare the raw output against the recorded result: block.
+			// --update rewrites the baseline (creating it the first time) instead
+			// of asserting. Skipped for looped steps, where a single baseline can't
+			// match every iteration.
+			if e.snapshot && item == "" {
+				switch {
+				case e.update:
+					//#nosec G602 -- i is the range index over steps, always in bounds
+					steps[i].Result = []rondo.ResultItem{{Type: "text", Text: output}}
+					fmt.Fprintf(stdout, "    %s snapshot updated\n", yellowPlay("~:"))
+				case len(step.Result) == 0:
+					// no baseline to assert against; a forgotten record/--update must
+					// not read as a green pass in CI.
+					fmt.Fprintf(os.Stderr, "    %s no snapshot baseline; run play --update first\n", red("FAIL:"))
+					if status != "failed" {
+						status, statusMsg = "failed", "no snapshot baseline"
+					}
+					if !step.IgnoreErrors {
+						fails = append(fails, fmt.Sprintf("step %q: no snapshot baseline", name))
+					}
+				case output != snapshotText(step.Result):
+					fmt.Fprintf(os.Stderr, "    %s %s\n", red("FAIL:"), snapshotDiff(snapshotText(step.Result), output))
+					if status != "failed" {
+						status, statusMsg = "failed", "snapshot mismatch"
+					}
+					if !step.IgnoreErrors {
+						fails = append(fails, fmt.Sprintf("step %q: snapshot mismatch", name))
+					}
+				default:
+					fmt.Fprintf(stdout, "    %s snapshot\n", green("PASS:"))
+				}
+			}
+			e.recDur(name, dispServer, step, status, statusMsg, callDur)
 
 			fmt.Fprintln(stdout)
 		}

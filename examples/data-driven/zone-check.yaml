@@ -1,0 +1,19 @@
+# Data-driven run: the same rondo plays once per row of a CSV/JSON file, with
+# each column injected as a {{key}}. Run it:
+#
+#   ocarina play examples/data-driven/zone-check.yaml --data examples/data-driven/timezones.csv
+#
+# Add --output junit to emit a JUnit report a CI dashboard can ingest.
+
+server:
+  command: uvx
+  args: [mcp-server-time]
+
+rondo:
+  - name: time is reported for the zone
+    tool: get_current_time
+    args:
+      timezone: "{{tz}}"
+    expect:
+      contains: "{{tz}}"
+      max_duration: 2s

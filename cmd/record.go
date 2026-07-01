@@ -133,13 +133,26 @@ and writes a rondo when the session ends.`,
 						Type string `json:"type"`
 						Text string `json:"text"`
 					} `json:"content"`
+					Structured json.RawMessage `json:"structuredContent"`
 				}
 				if err := json.Unmarshal(rc.Result, &result); err == nil {
-					for _, item := range result.Content {
-						step.Result = append(step.Result, rondo.ResultItem{
-							Type: item.Type,
-							Text: item.Text,
-						})
+					// Mirror how play derives a step's output so a recorded baseline
+					// matches on --snapshot: prefer structuredContent (unwrapped),
+					// else the text content blocks.
+					if len(result.Structured) > 0 {
+						var sc any
+						if json.Unmarshal(result.Structured, &sc) == nil {
+							if b, mErr := json.Marshal(unwrapStructured(sc)); mErr == nil {
+								step.Result = []rondo.ResultItem{{Type: "text", Text: string(b)}}
+							}
+						}
+					} else {
+						for _, item := range result.Content {
+							step.Result = append(step.Result, rondo.ResultItem{
+								Type: item.Type,
+								Text: item.Text,
+							})
+						}
 					}
 				}
 			}

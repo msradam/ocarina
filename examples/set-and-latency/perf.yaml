@@ -1,0 +1,25 @@
+# set: computes vars from CEL without a tool call (Ansible set_fact), and
+# expect.max_duration gates a single call's latency. Run it:
+#
+#   ocarina validate examples/set-and-latency/perf.yaml
+#   ocarina play     examples/set-and-latency/perf.yaml
+
+server:
+  command: uvx
+  args: [mcp-server-time]
+
+rondo:
+  # Build a timezone string from parts, no tool involved. set: keys evaluate in
+  # sorted order, so `zone` can reference `city`.
+  - name: derive the target zone
+    set:
+      city: "'Tokyo'"
+      zone: "'Asia/' + city"
+
+  - name: read the time, and hold it to a latency budget
+    tool: get_current_time
+    args:
+      timezone: "{{zone}}"
+    expect:
+      contains: "Asia/Tokyo"
+      max_duration: 1s

@@ -50,6 +50,9 @@ Example:
 		if len(c.Servers) == 0 {
 			return fmt.Errorf("rondo is missing a server: block")
 		}
+		if len(c.Steps) == 0 {
+			return fmt.Errorf("rondo has no steps (put them under rondo:, tasks:, or steps:)")
+		}
 
 		type schemaEntry struct {
 			required   []string
@@ -120,7 +123,7 @@ Example:
 			var errs, warns []string
 
 			// motif: a reusable fragment. Confirm the file resolves and loads;
-			// deeper recursion into its steps is a TODO.
+			// its steps are not recursively validated here.
 			if step.Motif != "" {
 				path := step.Motif
 				if !filepath.IsAbs(path) {
@@ -141,9 +144,9 @@ Example:
 				continue
 			}
 
-			// step must declare an action (tool, resource, list_resources, or sleep)
-			if step.Tool == "" && step.Resource == "" && step.ListResources == "" && step.Sleep == "" {
-				errs = append(errs, "step has no tool, resource, list_resources, or sleep field")
+			// step must declare an action (tool, resource, list_resources, sleep, or set)
+			if step.Tool == "" && step.Resource == "" && step.ListResources == "" && step.Sleep == "" && len(step.Set) == 0 {
+				errs = append(errs, "step has no tool, resource, list_resources, sleep, or set field")
 			}
 
 			serverKey := c.StepServerKey(step)
@@ -155,6 +158,12 @@ Example:
 			if step.Timeout != "" {
 				if _, err := time.ParseDuration(step.Timeout); err != nil {
 					errs = append(errs, fmt.Sprintf("invalid timeout %q: %v", step.Timeout, err))
+				}
+			}
+
+			if step.Retry != nil && step.Retry.Delay != "" {
+				if d, err := time.ParseDuration(step.Retry.Delay); err != nil || d < 0 {
+					errs = append(errs, fmt.Sprintf("invalid retry delay %q", step.Retry.Delay))
 				}
 			}
 
@@ -253,6 +262,18 @@ Example:
 					errs = append(errs, fmt.Sprintf("expect.rule: %v", synErr))
 				}
 			}
+			if step.Expect != nil && step.Expect.MaxDuration != "" {
+				if d, err := time.ParseDuration(step.Expect.MaxDuration); err != nil {
+					errs = append(errs, fmt.Sprintf("invalid max_duration %q: %v", step.Expect.MaxDuration, err))
+				} else if d <= 0 {
+					errs = append(errs, fmt.Sprintf("invalid max_duration %q: must be positive", step.Expect.MaxDuration))
+				}
+			}
+			for k, expr := range step.Set {
+				if synErr := condition.CheckSyntax(expr); synErr != nil {
+					errs = append(errs, fmt.Sprintf("set %s: %v", k, synErr))
+				}
+			}
 
 			if len(errs) == 0 && len(warns) == 0 {
 				fmt.Fprintf(os.Stdout, "%s  %s\n", prefix, okLabel)
@@ -276,7 +297,12 @@ Example:
 			if step.Echo != "" {
 				available[step.Echo] = true
 			}
+			for k := range step.Set {
+				available[k] = true
+			}
 		}
+
+		strict, _ := cmd.Flags().GetBool("strict")
 
 		fmt.Fprintln(os.Stdout)
 		if totalErrs == 0 && totalWarns == 0 {
@@ -286,6 +312,9 @@ Example:
 		fmt.Fprintf(os.Stdout, "%s\n", color.RedString("%d error(s)", totalErrs)+color.YellowString(", %d warning(s)", totalWarns))
 		if totalErrs > 0 {
 			return fmt.Errorf("%d validation error(s)", totalErrs)
+		}
+		if strict && totalWarns > 0 {
+			return fmt.Errorf("%d warning(s) with --strict", totalWarns)
 		}
 		return nil
 	},
@@ -309,5 +338,6 @@ func flattenForValidation(steps []rondo.Step) []rondo.Step {
 }
 
 func init() {
+	validateCmd.Flags().Bool("strict", false, "treat warnings (e.g. out-of-schema args) as failures for CI")
 	rootCmd.AddCommand(validateCmd)
 }

@@ -40,6 +40,9 @@ Example:
 		if len(r.Servers) == 0 {
 			return fmt.Errorf("rondo is missing a server: block")
 		}
+		if len(r.Steps) == 0 {
+			return fmt.Errorf("rondo has no steps (put them under rondo:, tasks:, or steps:)")
+		}
 		stdout = io.Discard // silence per-call output during the run
 
 		vus, _ := cmd.Flags().GetInt("vus")
@@ -176,7 +179,7 @@ func runVU(ctx context.Context, r *rondo.File, coll *load.Collector, started *in
 				notes[step.Echo] = out
 			}
 			if ok && step.Expect != nil {
-				ok = checkExpect(step.Expect, out, isErr, notes) == ""
+				ok = checkExpect(step.Expect, out, isErr, d, notes) == ""
 			}
 			coll.Record(d, ok)
 		}
